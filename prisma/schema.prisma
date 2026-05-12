@@ -1,0 +1,1024 @@
+// NukezoneReborn — Prisma Schema
+// All domain models in one file. Domain ownership documented in docs/DOMAIN_MODULES.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH DOMAIN  (NextAuth v5 compatible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Player {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String?
+  role          Role      @default(PLAYER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       UserProfile?
+  nation        Nation?
+  behaviorScore BehaviorScore?
+  bans          Ban[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user Player @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user Player @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  playerId    String   @unique
+  displayName String
+  bio         String?
+  honor       Int      @default(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORLD DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GameWorld {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  status     WorldStatus @default(ACTIVE)
+  maxNations Int         @default(1000)
+  tickCount  BigInt      @default(0)
+  startedAt  DateTime    @default(now())
+  endedAt    DateTime?
+
+  nations     Nation[]
+  worldEvents WorldEvent[]
+  marketOrders MarketOrder[]
+  marketTrades MarketTrade[]
+  priceHistory PriceHistory[]
+  alliances    Alliance[]
+  gameLogs     GameLog[]
+  rankings     RankingSnapshot[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NATION DOMAIN  (central entity — owned by Economy domain)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Nation {
+  id          String       @id @default(cuid())
+  worldId     String
+  playerId    String       @unique
+  name        String
+  status      NationStatus @default(ACTIVE)
+  hp          Int          @default(1000)
+  maxHp       Int          @default(1000)
+  totalUnits  Int          @default(0)
+  coordX      Int          @default(0)
+  coordY      Int          @default(0)
+  color       String       @default("#22c55e")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  world       GameWorld    @relation(fields: [worldId], references: [id])
+  player      Player       @relation(fields: [playerId], references: [id])
+
+  // Economy
+  resource     Resource?
+  morale       MoraleRecord?
+  bankAccount  BankAccount?
+  upkeepLogs   UpkeepLog[]
+  sentTransactions     Transaction[] @relation("TxSender")
+  receivedTransactions Transaction[] @relation("TxReceiver")
+
+  // Territory
+  territories  Territory[]
+  ciRating     CIRating?
+
+  // Military
+  armies       Army[]
+
+  // Battle
+  attackingBattles  Battle[] @relation("BattleAttacker")
+  defendingBattles  Battle[] @relation("BattleDefender")
+  armyMovements     ArmyMovement[] @relation("MovementAttacker")
+  incomingMovements ArmyMovement[] @relation("MovementTarget")
+
+  // Espionage / Thief
+  spyUnits          SpyUnit[]
+  spyOpsInitiated   SpyOperation[] @relation("SpyInitiator")
+  spyOpsTargeted    SpyOperation[] @relation("SpyTarget")
+  thiefUnits        ThiefUnit[]
+  thiefOpsInitiated ThiefOperation[] @relation("ThiefInitiator")
+  thiefOpsTargeted  ThiefOperation[] @relation("ThiefTarget")
+
+  // Research
+  researchProjects ResearchProgress[]
+
+  // Notifications
+  notifications Notification[]
+
+  // Alliance
+  allianceMember AllianceMember?
+
+  // Anti-cheat
+  securityEvents SecurityEvent[]
+
+  @@index([worldId, status])
+  @@index([playerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ECONOMY DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Resource {
+  id        String   @id @default(cuid())
+  nationId  String   @unique
+  gold      Int      @default(5000)
+  food      Int      @default(1000)
+  steel     Int      @default(500)
+  energy    Int      @default(200)
+  updatedAt DateTime @updatedAt
+
+  nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
+}
+
+model MoraleRecord {
+  id       String @id @default(cuid())
+  nationId String @unique
+  morale   Int    @default(75)
+
+  nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id        String          @id @default(cuid())
+  type      TransactionType
+  fromId    String?
+  toId      String?
+  amount    Int
+  resource  String          @default("gold")
+  note      String?
+  createdAt DateTime        @default(now())
+
+  from Nation? @relation("TxSender",   fields: [fromId], references: [id])
+  to   Nation? @relation("TxReceiver", fields: [toId],   references: [id])
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([createdAt])
+}
+
+model UpkeepLog {
+  id       String   @id @default(cuid())
+  nationId String
+  goldCost Int
+  tickTime DateTime @default(now())
+
+  nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
+
+  @@index([nationId, tickTime])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BANKING DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BankAccount {
+  id        String   @id @default(cuid())
+  nationId  String   @unique
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  nation       Nation            @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  transactions BankTransaction[]
+  loans        Loan[]
+}
+
+model BankTransaction {
+  id        String              @id @default(cuid())
+  accountId String
+  type      BankTransactionType
+  amount    Int
+  createdAt DateTime            @default(now())
+
+  account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+model Loan {
+  id        String     @id @default(cuid())
+  accountId String
+  principal Int
+  remaining Int
+  status    LoanStatus @default(ACTIVE)
+  takenAt   DateTime   @default(now())
+  dueAt     DateTime
+
+  account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TERRITORY DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Territory {
+  id            String      @id @default(cuid())
+  worldId       String
+  ownerNationId String?
+  coordX        Int
+  coordY        Int
+  type          TerrainType @default(PLAINS)
+  irradiated    Boolean     @default(false)
+  radiationLevel Float      @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  owner         Nation?         @relation(fields: [ownerNationId], references: [id])
+  radiationZones RadiationZone[]
+  battles       Battle[]
+
+  @@unique([worldId, coordX, coordY])
+  @@index([ownerNationId])
+}
+
+model RadiationZone {
+  id          String   @id @default(cuid())
+  territoryId String
+  intensity   Float    @default(1.0)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  territory Territory @relation(fields: [territoryId], references: [id])
+
+  @@index([territoryId, expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MILITARY DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model UnitType {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  slug         String  @unique
+  speed        Float
+  attack       Int
+  defense      Int
+  goldUpkeep   Int
+  goldCost     Int
+  steelCost    Int
+  trainTimeSec Int
+  requiresTech String?
+  sortOrder    Int     @default(0)
+
+  units Unit[]
+}
+
+model Army {
+  id       String     @id @default(cuid())
+  nationId String
+  name     String     @default("Army")
+  status   ArmyStatus @default(STATIONED)
+
+  nation    Nation  @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  units     Unit[]
+  movements ArmyMovement[]
+
+  @@index([nationId])
+}
+
+model Unit {
+  id         String @id @default(cuid())
+  armyId     String
+  unitTypeId String
+  quantity   Int    @default(0)
+
+  army     Army     @relation(fields: [armyId],     references: [id], onDelete: Cascade)
+  unitType UnitType @relation(fields: [unitTypeId], references: [id])
+
+  @@unique([armyId, unitTypeId])
+}
+
+model UnitTraining {
+  id          String   @id @default(cuid())
+  nationId    String
+  unitTypeId  String
+  quantity    Int
+  startedAt   DateTime @default(now())
+  completesAt DateTime
+
+  @@index([nationId, completesAt])
+}
+
+model ArmyMovement {
+  id                String         @id @default(cuid())
+  worldId           String
+  armyId            String
+  attackerNationId  String
+  targetNationId    String
+  targetTerritoryId String?
+  status            MovementStatus @default(MOVING)
+  launchedAt        DateTime       @default(now())
+  eta               DateTime
+  battleId          String?        @unique
+
+  army           Army    @relation(fields: [armyId],           references: [id])
+  attackerNation Nation  @relation("MovementAttacker", fields: [attackerNationId], references: [id])
+  targetNation   Nation  @relation("MovementTarget",   fields: [targetNationId],   references: [id])
+  battle         Battle? @relation(fields: [battleId], references: [id])
+
+  @@index([worldId, status, eta])
+  @@index([targetNationId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BATTLE DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Battle {
+  id               String       @id @default(cuid())
+  worldId          String
+  attackerNationId String
+  defenderNationId String
+  targetTerritoryId String?
+  type             BattleType   @default(CONVENTIONAL)
+  status           BattleStatus @default(PENDING)
+  seed             Int
+  winner           String?
+  createdAt        DateTime     @default(now())
+  resolvedAt       DateTime?
+
+  attackerNation Nation     @relation("BattleAttacker", fields: [attackerNationId], references: [id])
+  defenderNation Nation     @relation("BattleDefender", fields: [defenderNationId], references: [id])
+  territory      Territory? @relation(fields: [targetTerritoryId], references: [id])
+  movement       ArmyMovement?
+  report         BattleReport?
+  casualties     Casualty[]
+
+  @@index([worldId, status])
+  @@index([attackerNationId])
+  @@index([defenderNationId])
+}
+
+model BattleReport {
+  id        String   @id @default(cuid())
+  battleId  String   @unique
+  payload   Json
+  createdAt DateTime @default(now())
+
+  battle Battle @relation(fields: [battleId], references: [id])
+
+  @@index([createdAt])
+}
+
+model Casualty {
+  id         String @id @default(cuid())
+  battleId   String
+  nationId   String
+  unitTypeId String
+  count      Int
+
+  battle Battle @relation(fields: [battleId], references: [id])
+
+  @@index([battleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MARKET DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MarketOrder {
+  id           String       @id @default(cuid())
+  nationId     String
+  worldId      String
+  side         OrderSide
+  resource     ResourceType
+  quantity     Int
+  pricePerUnit Int
+  filledQty    Int          @default(0)
+  status       OrderStatus  @default(OPEN)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@index([worldId, resource, side, status, pricePerUnit, createdAt])
+  @@index([nationId, status])
+}
+
+model MarketTrade {
+  id          String       @id @default(cuid())
+  worldId     String
+  buyOrderId  String
+  sellOrderId String
+  resource    ResourceType
+  quantity    Int
+  price       Int
+  createdAt   DateTime     @default(now())
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@index([worldId, resource, createdAt])
+}
+
+model PriceHistory {
+  id       String       @id @default(cuid())
+  worldId  String
+  resource ResourceType
+  open     Int
+  high     Int
+  low      Int
+  close    Int
+  volume   Int
+  candleAt DateTime
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@unique([worldId, resource, candleAt])
+  @@index([worldId, resource, candleAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALLIANCE DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Alliance {
+  id        String         @id @default(cuid())
+  worldId   String
+  name      String
+  tag       String
+  status    AllianceStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+
+  world    GameWorld @relation(fields: [worldId], references: [id])
+  members  AllianceMember[]
+  outboundTreaties AllianceTreaty[] @relation("TreatyOwner")
+  inboundTreaties  AllianceTreaty[] @relation("TreatyTarget")
+  treasury AllianceTreasury?
+
+  @@index([worldId, status])
+}
+
+model AllianceMember {
+  id         String       @id @default(cuid())
+  allianceId String
+  nationId   String       @unique
+  role       AllianceRole @default(MEMBER)
+  joinedAt   DateTime     @default(now())
+
+  alliance Alliance @relation(fields: [allianceId], references: [id])
+  nation   Nation   @relation(fields: [nationId],   references: [id])
+}
+
+model AllianceTreaty {
+  id               String       @id @default(cuid())
+  allianceId       String
+  targetAllianceId String?
+  targetNationId   String?
+  type             TreatyType
+  status           TreatyStatus @default(PROPOSED)
+  proposedAt       DateTime     @default(now())
+  acceptedAt       DateTime?
+  expiresAt        DateTime?
+
+  alliance       Alliance  @relation("TreatyOwner",  fields: [allianceId],       references: [id])
+  targetAlliance Alliance? @relation("TreatyTarget", fields: [targetAllianceId], references: [id])
+
+  @@index([allianceId, status])
+}
+
+model AllianceTreasury {
+  id         String   @id @default(cuid())
+  allianceId String   @unique
+  gold       Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  alliance Alliance @relation(fields: [allianceId], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESEARCH DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TechNode {
+  id              String       @id @default(cuid())
+  name            String       @unique
+  slug            String       @unique
+  category        TechCategory
+  description     String
+  goldCost        Int
+  durationSecs    Int
+  prerequisiteId  String?
+  bonusType       String?
+  bonusValue      Float?
+  sortOrder       Int          @default(0)
+
+  prerequisite     TechNode?  @relation("TechPrereq", fields: [prerequisiteId], references: [id])
+  unlocks          TechNode[] @relation("TechPrereq")
+  researchProjects ResearchProgress[]
+}
+
+model ResearchProgress {
+  id          String         @id @default(cuid())
+  nationId    String
+  techNodeId  String
+  status      ResearchStatus @default(IN_PROGRESS)
+  startedAt   DateTime       @default(now())
+  completesAt DateTime
+
+  nation   Nation   @relation(fields: [nationId],  references: [id])
+  techNode TechNode @relation(fields: [techNodeId], references: [id])
+
+  @@unique([nationId, techNodeId])
+  @@index([nationId, status, completesAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ESPIONAGE DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SpyUnit {
+  id                String    @id @default(cuid())
+  nationId          String
+  skillLevel        Int       @default(1)
+  status            SpyStatus @default(IDLE)
+  missionsCompleted Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  nation     Nation         @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  operations SpyOperation[]
+
+  @@index([nationId, status])
+}
+
+model SpyOperation {
+  id                String      @id @default(cuid())
+  spyUnitId         String
+  initiatorNationId String
+  targetNationId    String
+  type              SpyOpType
+  status            SpyOpStatus @default(SCHEDULED)
+  scheduledAt       DateTime
+  resolvedAt        DateTime?
+  success           Boolean?
+  detected          Boolean?
+  payload           Json?
+
+  spyUnit         SpyUnit @relation(fields: [spyUnitId],         references: [id])
+  initiatorNation Nation  @relation("SpyInitiator", fields: [initiatorNationId], references: [id])
+  targetNation    Nation  @relation("SpyTarget",    fields: [targetNationId],    references: [id])
+  report          SpyReport?
+
+  @@index([status, scheduledAt])
+  @@index([initiatorNationId, targetNationId])
+}
+
+model SpyReport {
+  id          String    @id @default(cuid())
+  operationId String    @unique
+  nationId    String
+  payload     Json
+  read        Boolean   @default(false)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  operation SpyOperation @relation(fields: [operationId], references: [id])
+
+  @@index([nationId, read])
+}
+
+model CIRating {
+  id        String   @id @default(cuid())
+  nationId  String   @unique
+  rating    Int      @default(10)
+  updatedAt DateTime @updatedAt
+
+  nation Nation @relation(fields: [nationId], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THIEF DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ThiefUnit {
+  id        String      @id @default(cuid())
+  nationId  String
+  agility   Int         @default(1)
+  status    ThiefStatus @default(IDLE)
+  createdAt DateTime    @default(now())
+
+  nation     Nation           @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  operations ThiefOperation[]
+
+  @@index([nationId, status])
+}
+
+model ThiefOperation {
+  id                String        @id @default(cuid())
+  thiefUnitId       String
+  initiatorNationId String
+  targetNationId    String
+  type              ThiefOpType
+  status            ThiefOpStatus @default(SCHEDULED)
+  scheduledAt       DateTime
+  resolvedAt        DateTime?
+  success           Boolean?
+  detected          Boolean?
+  amountStolen      Int?
+
+  thiefUnit       ThiefUnit @relation(fields: [thiefUnitId],       references: [id])
+  initiatorNation Nation    @relation("ThiefInitiator", fields: [initiatorNationId], references: [id])
+  targetNation    Nation    @relation("ThiefTarget",    fields: [targetNationId],    references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([initiatorNationId, targetNationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATION DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  nationId  String
+  type      NotificationType
+  payload   Json
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  nation Nation @relation(fields: [nationId], references: [id])
+
+  @@index([nationId, read, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  nationId  String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([nationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORLD EVENTS DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WorldEvent {
+  id          String           @id @default(cuid())
+  worldId     String
+  type        WorldEventType
+  status      WorldEventStatus @default(ACTIVE)
+  description String
+  startedAt   DateTime         @default(now())
+  endsAt      DateTime?
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@index([worldId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEADERBOARD DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RankingSnapshot {
+  id        String   @id @default(cuid())
+  worldId   String
+  nationId  String
+  score     Int
+  rank      Int
+  snappedAt DateTime @default(now())
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@index([worldId, snappedAt])
+  @@index([worldId, score])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANTI-CHEAT DOMAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BehaviorScore {
+  id        String   @id @default(cuid())
+  playerId  String   @unique
+  score     Int      @default(0)
+  signals   Json     @default("[]")
+  updatedAt DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  playerId  String
+  nationId  String?
+  type      String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  nation Nation? @relation(fields: [nationId], references: [id])
+
+  @@index([playerId, createdAt])
+}
+
+model Ban {
+  id        String    @id @default(cuid())
+  playerId  String
+  action    String
+  reason    String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOG  (append-only — never updated)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GameLog {
+  id        BigInt   @id @default(autoincrement())
+  worldId   String
+  eventType String
+  payload   Json
+  timestamp DateTime @default(now())
+
+  world GameWorld @relation(fields: [worldId], references: [id])
+
+  @@index([worldId, timestamp])
+  @@index([timestamp])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  PLAYER
+  MODERATOR
+  ADMIN
+}
+
+enum WorldStatus {
+  ACTIVE
+  ENDED
+  ARCHIVED
+}
+
+enum NationStatus {
+  ACTIVE
+  PROTECTED
+  VACATION
+  DESTROYED
+}
+
+enum ArmyStatus {
+  STATIONED
+  MOVING
+  IN_BATTLE
+}
+
+enum MovementStatus {
+  MOVING
+  ARRIVED
+  CANCELLED
+}
+
+enum BattleType {
+  CONVENTIONAL
+  NUCLEAR
+  TACTICAL_NUKE
+}
+
+enum BattleStatus {
+  PENDING
+  RESOLVING
+  RESOLVED
+  FORCED_DRAW
+}
+
+enum TerrainType {
+  PLAINS
+  MOUNTAINS
+  DESERT
+  FOREST
+  COASTAL
+  NUCLEAR_WASTELAND
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderStatus {
+  OPEN
+  PARTIAL
+  FILLED
+  CANCELLED
+}
+
+enum ResourceType {
+  GOLD
+  STEEL
+  FOOD
+  ENERGY
+}
+
+enum TransactionType {
+  TRANSFER
+  LOOT
+  ALLIANCE_CONTRIBUTION
+  ALLIANCE_DISTRIBUTION
+  MARKET_SALE
+  MARKET_PURCHASE
+  RESEARCH_COST
+  TRAINING_COST
+  UPKEEP
+}
+
+enum BankTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  INTEREST
+  LOAN_ISSUANCE
+  LOAN_REPAYMENT
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID
+  DEFAULTED
+}
+
+enum AllianceStatus {
+  ACTIVE
+  DISBANDED
+}
+
+enum AllianceRole {
+  LEADER
+  OFFICER
+  MEMBER
+}
+
+enum TreatyType {
+  NON_AGGRESSION_PACT
+  TRADE_AGREEMENT
+  MUTUAL_DEFENSE
+  FULL_ALLIANCE
+  WAR_DECLARATION
+}
+
+enum TreatyStatus {
+  PROPOSED
+  ACTIVE
+  EXPIRED
+  BROKEN
+  REJECTED
+}
+
+enum TechCategory {
+  MILITARY
+  ECONOMY
+  DEFENSE
+  ESPIONAGE
+  NUCLEAR
+}
+
+enum ResearchStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SpyStatus {
+  IDLE
+  ON_MISSION
+  CAPTURED
+  DEAD
+}
+
+enum SpyOpType {
+  SCOUT_MILITARY
+  SCOUT_ECONOMY
+  STEAL_BLUEPRINTS
+  SABOTAGE_COMMS
+  SABOTAGE_RADAR
+  PLANT_MISINFORMATION
+  ASSASSINATE_COMMANDER
+}
+
+enum SpyOpStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  DETECTED
+}
+
+enum ThiefStatus {
+  IDLE
+  ON_OPERATION
+  JAILED
+  DEAD
+}
+
+enum ThiefOpType {
+  STEAL_GOLD
+  STEAL_STEEL
+  STEAL_FOOD
+  SABOTAGE_MINE
+  SABOTAGE_FARM
+  SABOTAGE_PLANT
+  INCITE_RIOT
+  ASSASSINATE
+}
+
+enum ThiefOpStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CAPTURED
+}
+
+enum NotificationType {
+  INCOMING_ATTACK
+  BATTLE_RESOLVED
+  SPY_DETECTED
+  THIEF_DETECTED
+  DIPLOMACY_PROPOSAL
+  RESEARCH_COMPLETE
+  ALLIANCE_INVITE
+  WORLD_EVENT
+  NATION_DESTROYED
+  STARVATION_WARNING
+}
+
+enum WorldEventType {
+  NUCLEAR_WINTER
+  UN_SANCTIONS
+  ARMS_EMBARGO
+  ECONOMIC_BOOM
+}
+
+enum WorldEventStatus {
+  ACTIVE
+  ENDED
+}
