@@ -253,14 +253,24 @@ Last updated: 2026-05-09
 
 ## Completed Tasks
 
+### M1 — Project Foundation ✅
 - [x] Project documentation suite (SESSION 1)
-- [x] MMO architecture design (SESSION 2)
-- [x] All 17 domain modules designed
-- [x] Tick system designed with BullMQ
-- [x] Battle engine formulas designed
-- [x] Economy engine + sinks designed
-- [x] Espionage/thief engine designed
-- [x] Real-time architecture designed
-- [x] Database scaling strategy designed
-- [x] Anti-cheat architecture designed
-- [x] DevOps + infrastructure designed
+- [x] MMO architecture design — all docs in `docs/`
+- [x] Next.js 16 + React 19 scaffold
+- [x] All game dependencies installed (bullmq, ioredis, socket.io, zod, pino, etc.)
+- [x] Prisma v7 configured with `prisma.config.ts` + `@prisma/adapter-pg`
+- [x] Full Prisma schema — 17 domain models, 30 enums
+- [x] Schema migrated to Supabase via MCP (47 tables)
+- [x] `src/lib/db.ts` — Prisma client with pg adapter
+- [x] `src/lib/redis.ts` — ioredis singleton
+- [x] `src/lib/logger.ts` — Pino structured logger
+- [x] `src/lib/lock.ts` — distributed lock utility
+- [x] `src/lib/game-constants.ts` — all game balance values
+- [x] `src/lib/auth.ts` — NextAuth v5 with Prisma adapter
+- [x] `src/server/queues/index.ts` — all 11 BullMQ queues
+- [x] `src/server/workers/` — tick, battle, notification worker stubs
+- [x] `src/server/websocket/` — Socket.io server + Redis pub/sub broadcast
+- [x] `src/middleware.ts` — route protection
+- [x] shadcn/ui initialized
+- [x] TypeScript — zero errors
+- [x] GitHub remote connected + Supabase MCP configured

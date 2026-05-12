@@ -1,140 +1,105 @@
 # SESSION_HANDOFF.md — NukezoneReborn
 
 > Read this file FIRST at the start of every session.
-> It contains the most current state of the project.
 
 ---
 
-## Session: 2026-05-09 — MMO Architecture Design (Phase 2)
+## Session: 2026-05-12 — M1 Foundation Complete
 
 ### What Was Done
-- Completed full MMO architecture redesign — all systems designed as real live-service game infrastructure
-- Created `ARCHITECTURE_V2.md` (supersedes ARCHITECTURE.md) — full system map, domain ownership, action processing pipeline
-- Created `docs/DOMAIN_MODULES.md` — all 17 domain modules with services, events, DB ownership, formulas
-- Created `docs/TICK_SYSTEM.md` — full BullMQ tick architecture with code, timing diagrams, Redis keys
-- Created `docs/BATTLE_ENGINE.md` — deterministic server-authoritative battle engine, all phases, formulas, seeded RNG
-- Created `docs/ECONOMY_ENGINE.md` — inflation prevention, upkeep scaling, banking, market order book, sinks
-- Created `docs/ESPIONAGE_ENGINE.md` — spy/thief ops lifecycle, detection formula, paranoia mechanic, misinformation
-- Created `docs/REALTIME_ARCHITECTURE.md` — Socket.io room strategy, Redis pub/sub broadcast, offline buffering
-- Created `docs/DATABASE_SCALING.md` — hot/cold tables, partitioning, indexes, Redis caching, archival
-- Created `docs/ANTI_CHEAT.md` — idempotency, distributed locks, behavioral scoring, economy anomaly detection
-- Created `docs/DEVOPS.md` — 3-phase infrastructure, Kubernetes architecture, CI/CD, observability, DR
+- Fixed Prisma v7 breaking change: removed `url`/`directUrl` from `schema.prisma`, created `prisma.config.ts` with dotenv loading, installed `@prisma/adapter-pg` + `pg`
+- Fixed `db.ts` to use `PrismaPg` adapter (required by Prisma v7)
+- Fixed `lock.ts` ioredis SET NX overload via `redis.call()`
+- Ran `prisma generate` — Prisma client generated successfully
+- Applied full schema migration to Supabase via MCP (bypassed blocked port 5432)
+  - 47 tables, 30 enums, 55+ indexes, 52 foreign keys
+  - Migration name: `init_full_schema`
+- Connected Supabase MCP server to project (`.mcp.json`)
+- Fixed GitHub CLI PATH issue (`C:\Program Files\GitHub CLI` added to user PATH + `~/.bash_profile`)
+- Ran `gh auth setup-git` — HTTPS push now works without prompts
+- `npm run type-check` → **zero errors**
+- Initialized shadcn/ui
+- Added `@prisma/adapter-pg`, `pg`, `@types/pg`, `pino-pretty`, `@types/bcryptjs`, `@types/uuid` to deps
 
 ### Current State
-**No application code exists yet.** Repository contains documentation only. Phase 1 (foundation) has not started.
+**M1 is complete.** All infrastructure is in place:
+- ✅ Next.js 16 + React 19 scaffolded
+- ✅ All game dependencies installed (bullmq, ioredis, socket.io, zod, pino, etc.)
+- ✅ Prisma schema — all 17 domain models in Supabase
+- ✅ Core lib files: `db.ts`, `redis.ts`, `logger.ts`, `lock.ts`, `game-constants.ts`
+- ✅ BullMQ queues + worker stubs
+- ✅ NextAuth v5 + Prisma adapter configured
+- ✅ WebSocket server skeleton + Redis pub/sub broadcast
+- ✅ Route protection middleware
+- ✅ shadcn/ui initialized
+- ✅ TypeScript — zero errors
 
-Architecture is fully designed. Implementation can begin.
-
-### New Technology Decisions (vs Phase 1 plan)
-
-| Decision | Choice | Reason |
-|---|---|---|
-| Job queues | BullMQ | Durable, Redis-backed, delayed jobs, repeatable |
-| Cache + locks | Redis (ioredis) | BullMQ requires it; also used for locks, leaderboard, session |
-| Edge rate limiting | Upstash + @upstash/ratelimit | Works in Vercel Edge Middleware |
-| Logging | Pino | Structured JSON, fast, low overhead |
-| Tracing | OpenTelemetry | Standard, portable |
-| WS broadcast (cross-process) | Redis pub/sub | Workers can emit to WS server without shared memory |
-
-### Updated Dependencies to Install (Phase 1)
-
-```bash
-# Core
-npm install next@latest react react-dom typescript
-
-# State
-npm install @tanstack/react-query @tanstack/react-query-devtools zustand immer
-
-# Animations
-npm install framer-motion
-
-# WebSockets
-npm install socket.io socket.io-client @socket.io/redis-adapter
-
-# Auth
-npm install next-auth@beta @auth/prisma-adapter
-
-# Database
-npm install prisma @prisma/client
-
-# Queue system
-npm install bullmq ioredis
-
-# Rate limiting
-npm install @upstash/redis @upstash/ratelimit
-
-# Validation
-npm install zod bcryptjs
-npm install -D @types/bcryptjs
-
-# Logging
-npm install pino pino-pretty
-
-# Utilities
-npm install uuid date-fns
-npm install -D @types/uuid
-
-# PWA
-npm install next-pwa
-```
+### Current Focus
+**Milestone M2 — Core Game Loop**
 
 ### Immediate Next Actions
 
-1. **Scaffold Next.js project:**
+1. **Seed the database** — insert initial `GameWorld` + all `UnitType` rows + `TechNode` tree:
    ```bash
-   npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
+   # Create: prisma/seed.ts
+   npx prisma db seed
    ```
 
-2. **Install all dependencies** (list above)
+2. **Build auth pages** — `/app/(auth)/login/page.tsx` and `/app/(auth)/register/page.tsx`
 
-3. **Set up folder structure** (per ARCHITECTURE_V2.md):
-   ```
-   src/app/ src/components/ src/hooks/ src/lib/ src/server/ src/store/ src/types/
-   ```
+3. **Build game shell layout** — `src/app/(game)/layout.tsx` with sidebar + topbar
 
-4. **Initialize Prisma + write schema** (per DOMAIN_MODULES.md — all tables)
+4. **Nation creation flow** — after registration, player creates their nation
 
-5. **Set up BullMQ queue infrastructure** (`src/server/queues/index.ts`)
+5. **Dashboard page** — show nation stats pulled from Supabase via Prisma
 
-6. **Set up Redis connection** (`src/lib/redis.ts`)
+6. **Economy tick (stub)** — `src/server/game-engine/resources.ts` — income/upkeep formulas
 
-7. **Configure NextAuth with Prisma adapter**
+### Architecture Decisions Locked In
 
-### Blockers / Open Questions
-
-- **Game world model**: Should the game have a single persistent world, multiple world instances, or seasonal resets? Decision needed before DB schema finalization.
-- **Map design**: Grid-based coordinates? Hex grid? Abstract (no physical map)? Original Nukezone was semi-abstract.
-- **Tick worker deployment**: For MVP on Railway, Next.js custom server vs standalone worker process?
-
-### Architecture Documents Reference
-
-| File | What's in it |
+| Decision | Choice |
 |---|---|
-| `ARCHITECTURE_V2.md` | Master architecture, system map, action pipeline |
-| `docs/DOMAIN_MODULES.md` | All 17 domains, services, events, formulas |
-| `docs/TICK_SYSTEM.md` | BullMQ ticks, Redis keys, failure handling |
-| `docs/BATTLE_ENGINE.md` | Server-authoritative combat, all phases, pseudocode |
-| `docs/ECONOMY_ENGINE.md` | Resource flows, sinks, inflation prevention |
-| `docs/ESPIONAGE_ENGINE.md` | Spy/thief ops, detection formulas, paranoia |
-| `docs/REALTIME_ARCHITECTURE.md` | Socket.io rooms, pub/sub, offline buffering |
-| `docs/DATABASE_SCALING.md` | Indexes, partitioning, caching, archival |
-| `docs/ANTI_CHEAT.md` | Idempotency, locks, behavioral scoring |
-| `docs/DEVOPS.md` | Infrastructure phases, K8s, CI/CD, observability |
+| Database | Supabase PostgreSQL (Option C hybrid) |
+| ORM | Prisma v7 with `@prisma/adapter-pg` |
+| Auth | NextAuth v5 (credentials + Discord) |
+| Real-time | Socket.io + Redis pub/sub (NOT Supabase Realtime) |
+| Jobs | BullMQ on Redis |
+| RLS | Disabled (safe — no supabase-js client usage) |
+| Port 5432 | Blocked by ISP — use Supabase MCP for migrations |
+
+### Key File Locations
+
+| File | Purpose |
+|---|---|
+| `prisma/schema.prisma` | All 17 domain models |
+| `prisma.config.ts` | Prisma v7 datasource config (loads .env.local) |
+| `src/lib/db.ts` | Prisma client with pg adapter |
+| `src/lib/redis.ts` | ioredis singleton |
+| `src/lib/auth.ts` | NextAuth v5 config |
+| `src/lib/game-constants.ts` | All game balance numbers |
+| `src/server/queues/index.ts` | All 11 BullMQ queues |
+| `src/server/websocket/broadcast.ts` | Redis pub/sub emitter |
+| `scripts/encode-db-url.mjs` | URL-encodes DB password in .env.local |
+
+### Blockers / Warnings
+- **Port 5432 blocked by ISP** — always use Supabase MCP (`apply_migration`) for schema changes, NOT `prisma migrate dev`
+- **Redis not running locally** — workers and WS server need Redis. Install Redis or use Upstash for development.
+- **No seed data yet** — `GameWorld`, `UnitType`, `TechNode` tables are empty
 
 ---
 
-## Session: 2026-05-09 — Initial Project Setup (Session 1)
+## Previous Sessions
 
-### What Was Done
-- Repository created with documentation suite (README, PROJECT_CONTEXT, ARCHITECTURE, TODO, AI_RULES, ENVIRONMENT_SETUP, CHANGELOG)
-- Defined tech stack, folder structure, coding standards
-- Set architectural baseline
+### Session: 2026-05-09 — MMO Architecture Design
+- Designed all 17 domain modules, tick system, battle engine, economy engine, espionage engine, real-time architecture, database scaling, anti-cheat, devops
+- Created all docs in `docs/` folder
 
-### Status: Superseded by Phase 2 architecture
+### Session: 2026-05-09 — Initial Project Setup
+- Created project documentation suite, defined tech stack, scaffold decision
 
 ---
 
-## Session Template (copy for future sessions)
+## Session Template
 
 ```markdown
 ## Session: YYYY-MM-DD — [Description]

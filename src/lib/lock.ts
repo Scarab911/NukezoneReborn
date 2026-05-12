@@ -15,7 +15,8 @@ export async function acquireLock(
   const lockKey = `lock:${key}`;
   const token = `${process.pid}-${Date.now()}-${Math.random()}`;
 
-  const acquired = await redis.set(lockKey, token, "NX", "PX", ttlMs);
+  // Use call() to bypass ioredis v5 overload mismatch for SET NX PX
+  const acquired = (await redis.call("SET", lockKey, token, "NX", "PX", ttlMs)) as "OK" | null;
   if (!acquired) return null;
 
   const release = async () => {
