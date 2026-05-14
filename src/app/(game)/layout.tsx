@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GameSidebar } from "@/components/layout/GameSidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { AlertBar } from "@/components/game/AlertBar";
 
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -32,6 +33,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
           steel={nation?.resource?.steel}
           energy={nation?.resource?.energy}
         />
+        <AlertBar />
 
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           {children}
