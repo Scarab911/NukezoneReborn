@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import Discord from "next-auth/providers/discord";
 import { prisma } from "@/lib/db";
+import { authConfig } from "@/auth.config";
 import { z } from "zod";
 
 const CredentialsSchema = z.object({
@@ -11,6 +12,7 @@ const CredentialsSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
 
@@ -44,10 +46,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
+    ...authConfig.callbacks,
+
     async jwt({ token, user }) {
       if (user) {
         token.playerId = user.id;
-        // Fetch nationId and role for convenience
         const player = await prisma.player.findUnique({
           where: { id: user.id },
           select: {
@@ -69,10 +72,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.worldId  = token.worldId  as string | null;
       return session;
     },
-  },
-
-  pages: {
-    signIn:  "/login",
-    error:   "/login",
   },
 });
