@@ -4,68 +4,55 @@
 
 ---
 
-## Session: 2026-05-12 — M1 Foundation Complete
+## Session: 2026-05-14 — M2 continued (services, engine, stores, arsenal)
 
-### What Was Done
-- Fixed Prisma v7 breaking change: removed `url`/`directUrl` from `schema.prisma`, created `prisma.config.ts` with dotenv loading, installed `@prisma/adapter-pg` + `pg`
-- Fixed `db.ts` to use `PrismaPg` adapter (required by Prisma v7)
-- Fixed `lock.ts` ioredis SET NX overload via `redis.call()`
-- Ran `prisma generate` — Prisma client generated successfully
-- Applied full schema migration to Supabase via MCP (bypassed blocked port 5432)
-  - 47 tables, 30 enums, 55+ indexes, 52 foreign keys
-  - Migration name: `init_full_schema`
-- Connected Supabase MCP server to project (`.mcp.json`)
-- Fixed GitHub CLI PATH issue (`C:\Program Files\GitHub CLI` added to user PATH + `~/.bash_profile`)
-- Ran `gh auth setup-git` — HTTPS push now works without prompts
-- `npm run type-check` → **zero errors**
-- Initialized shadcn/ui
-- Added `@prisma/adapter-pg`, `pg`, `@types/pg`, `pino-pretty`, `@types/bcryptjs`, `@types/uuid` to deps
+### What Was Done (this session)
+- Updated SESSION_HANDOFF.md + TODO.md to reflect actual state
+- Built TanStack Query + Zustand providers (`Providers.tsx`)
+- Built domain services: `nation.service.ts`, `resource.service.ts`, `morale.service.ts`
+- Built economy engine: `src/server/game-engine/resources.ts`
+- Built Zustand stores: `useGameStore.ts`, `useUIStore.ts`
+- Built Arsenal page: unit list + training flow
+- Added WebSocket event types: `src/types/socket.ts`
+- Wired dashboard to TanStack Query polling
 
 ### Current State
-**M1 is complete.** All infrastructure is in place:
-- ✅ Next.js 16 + React 19 scaffolded
-- ✅ All game dependencies installed (bullmq, ioredis, socket.io, zod, pino, etc.)
-- ✅ Prisma schema — all 17 domain models in Supabase
-- ✅ Core lib files: `db.ts`, `redis.ts`, `logger.ts`, `lock.ts`, `game-constants.ts`
-- ✅ BullMQ queues + worker stubs
-- ✅ NextAuth v5 + Prisma adapter configured
-- ✅ WebSocket server skeleton + Redis pub/sub broadcast
-- ✅ Route protection middleware
-- ✅ shadcn/ui initialized
-- ✅ TypeScript — zero errors
+**M2 is ~60% complete.** App is runnable end-to-end:
+- ✅ Landing page (`/`)
+- ✅ Register + Login (`/register`, `/login`)
+- ✅ Nation setup (`/setup`)
+- ✅ Dashboard with live stats (`/dashboard`)
+- ✅ Arsenal page (`/arsenal`) — unit list + train
+- ✅ Service layer (nation, resource, morale)
+- ✅ Economy engine (income/upkeep formulas)
+- ✅ TanStack Query + Zustand providers wired
+- ❌ Economy tick running (Redis required locally)
+- ❌ Military page (attack flow)
+- ❌ Battle engine
+- ❌ Research page
+- ❌ All M3–M6 features
 
 ### Current Focus
-**Milestone M2 — Core Game Loop**
+**M2 — Core Game Loop (finishing)**
 
-### Immediate Next Actions
-
-1. **Seed the database** — insert initial `GameWorld` + all `UnitType` rows + `TechNode` tree:
-   ```bash
-   # Create: prisma/seed.ts
-   npx prisma db seed
-   ```
-
-2. **Build auth pages** — `/app/(auth)/login/page.tsx` and `/app/(auth)/register/page.tsx`
-
-3. **Build game shell layout** — `src/app/(game)/layout.tsx` with sidebar + topbar
-
-4. **Nation creation flow** — after registration, player creates their nation
-
-5. **Dashboard page** — show nation stats pulled from Supabase via Prisma
-
-6. **Economy tick (stub)** — `src/server/game-engine/resources.ts` — income/upkeep formulas
+Next tasks in priority order:
+1. Military page + unit training API (`POST /api/military/train`)
+2. Nation API polling with TanStack Query on dashboard
+3. Economy tick wired up (stub that runs without Redis for dev)
+4. Battle engine seeded-RNG + basic resolve
 
 ### Architecture Decisions Locked In
 
 | Decision | Choice |
 |---|---|
-| Database | Supabase PostgreSQL (Option C hybrid) |
-| ORM | Prisma v7 with `@prisma/adapter-pg` |
-| Auth | NextAuth v5 (credentials + Discord) |
-| Real-time | Socket.io + Redis pub/sub (NOT Supabase Realtime) |
+| Database | Supabase PostgreSQL via Prisma v7 + `@prisma/adapter-pg` |
+| Auth | NextAuth v5 — split config (`auth.config.ts` for edge proxy) |
+| Proxy | `src/proxy.ts` (Next.js 16 renamed from middleware) |
+| Real-time | Socket.io + Redis pub/sub |
 | Jobs | BullMQ on Redis |
-| RLS | Disabled (safe — no supabase-js client usage) |
-| Port 5432 | Blocked by ISP — use Supabase MCP for migrations |
+| Port 5432 | Blocked by ISP — use Supabase MCP for all schema changes |
+| base-ui | All base-ui components need `"use client"` directive |
+| Server Components | Never import base-ui/Radix in Server Components |
 
 ### Key File Locations
 
@@ -73,51 +60,30 @@
 |---|---|
 | `prisma/schema.prisma` | All 17 domain models |
 | `prisma.config.ts` | Prisma v7 datasource config (loads .env.local) |
+| `src/auth.config.ts` | Edge-safe NextAuth config (used by proxy) |
+| `src/proxy.ts` | Route protection (Next.js 16 proxy) |
+| `src/lib/auth.ts` | Full NextAuth config (Node.js only) |
 | `src/lib/db.ts` | Prisma client with pg adapter |
-| `src/lib/redis.ts` | ioredis singleton |
-| `src/lib/auth.ts` | NextAuth v5 config |
 | `src/lib/game-constants.ts` | All game balance numbers |
+| `src/server/services/` | Domain service functions |
+| `src/server/game-engine/` | Tick, combat, economy formulas |
 | `src/server/queues/index.ts` | All 11 BullMQ queues |
 | `src/server/websocket/broadcast.ts` | Redis pub/sub emitter |
-| `scripts/encode-db-url.mjs` | URL-encodes DB password in .env.local |
+| `src/types/socket.ts` | WebSocket event type definitions |
+| `src/store/` | Zustand stores |
+| `src/components/layout/Providers.tsx` | TanStack Query + Zustand providers |
 
 ### Blockers / Warnings
-- **Port 5432 blocked by ISP** — always use Supabase MCP (`apply_migration`) for schema changes, NOT `prisma migrate dev`
-- **Redis not running locally** — workers and WS server need Redis. Install Redis or use Upstash for development.
-- **No seed data yet** — `GameWorld`, `UnitType`, `TechNode` tables are empty
+- **Port 5432 blocked by ISP** — always use Supabase MCP for schema changes
+- **Redis not running locally** — BullMQ workers + WS server need Redis; dev can run without them (API routes work without Redis)
+- **Next.js 16 base-ui rule** — ANY component using `@base-ui/react` must have `"use client"` at the top
 
 ---
 
 ## Previous Sessions
 
-### Session: 2026-05-09 — MMO Architecture Design
-- Designed all 17 domain modules, tick system, battle engine, economy engine, espionage engine, real-time architecture, database scaling, anti-cheat, devops
-- Created all docs in `docs/` folder
-
-### Session: 2026-05-09 — Initial Project Setup
-- Created project documentation suite, defined tech stack, scaffold decision
-
----
-
-## Session Template
-
-```markdown
-## Session: YYYY-MM-DD — [Description]
-
-### What Was Done
--
-
-### Current State
-
-
-### Immediate Next Actions
-1.
-2.
-3.
-
-### Blockers
--
-
-### Files Modified
--
-```
+### Session: 2026-05-12 — M1 + M2 start
+- Next.js 16 scaffold, all deps, Prisma v7, Supabase migration (47 tables)
+- Auth pages (login, register), game shell (sidebar, topbar), dashboard
+- Nation setup flow, seed data (GameWorld + 7 UnitTypes + 13 TechNodes)
+- Fixed: middleware→proxy, split NextAuth config, base-ui "use client"
