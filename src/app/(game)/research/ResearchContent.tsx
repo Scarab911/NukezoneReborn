@@ -61,6 +61,21 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
     return () => clearInterval(t);
   }, []);
 
+  // Auto-complete any expired research on mount and every 10s
+  useEffect(() => {
+    async function checkComplete() {
+      const res = await fetch("/api/research/complete", { method: "POST" });
+      const data = await res.json() as { completed?: Array<{ name: string }> };
+      if (data.completed?.length) {
+        data.completed.forEach((r) => toast.success(`✅ Research complete: ${r.name}`));
+        router.refresh();
+      }
+    }
+    checkComplete();
+    const t = setInterval(checkComplete, 10_000);
+    return () => clearInterval(t);
+  }, [router]);
+
   const activeEntry = Object.entries(progressMap).find(
     ([, p]) => p.status === "IN_PROGRESS",
   );
