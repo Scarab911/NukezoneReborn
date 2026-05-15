@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/arsenal",    label: "Arsenal",    icon: Zap },
   { href: "/military",   label: "Military",   icon: Sword },
   { href: "/research",   label: "Research",   icon: FlaskConical },
-  { href: "/defense",    label: "Defense",    icon: Shield },
   { href: "/alliances",  label: "Alliances",  icon: Users },
   { href: "/market",     label: "Market",     icon: TrendingUp },
   { href: "/bank",       label: "Bank",       icon: Landmark },

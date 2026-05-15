@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
-const Schema = z.object({ techNodeId: z.string().cuid() });
+const Schema = z.object({ techNodeId: z.string().min(1) }); // IDs are plain strings from seed
 
 export async function POST(req: NextRequest) {
   const session = await auth();

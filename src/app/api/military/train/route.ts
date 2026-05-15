@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 
 const TrainSchema = z.object({
-  unitTypeId: z.string().cuid(),
+  unitTypeId: z.string().min(1), // IDs are UUIDs from seed, not cuid format
   quantity:   z.number().int().min(1).max(9999),
 });
 
