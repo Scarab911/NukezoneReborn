@@ -13,16 +13,11 @@ export async function GET() {
 
   const nations = await prisma.nation.findMany({
     where:   { worldId: "world_01", status: { in: ["ACTIVE", "PROTECTED"] } },
-    select:  {
-      id: true, name: true, status: true,
-      hp: true, maxHp: true, totalUnits: true, color: true,
-      morale: { select: { morale: true } },
-    },
+    select:  { id: true, name: true, color: true, status: true, totalUnits: true },
     orderBy: { totalUnits: "desc" },
     take:    100,
   });
 
-  // Tag which one is ours so client can filter
   return NextResponse.json({
     nations: nations.map((n) => ({ ...n, isOwn: n.id === myNation?.id })),
   });

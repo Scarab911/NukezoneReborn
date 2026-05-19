@@ -10,12 +10,12 @@ import { Separator } from "@/components/ui/separator";
 interface Transaction { id: string; type: string; amount: number; createdAt: string; }
 
 interface Props {
-  gold:         number;
+  money:        number;
   balance:      number;
   transactions: Transaction[];
 }
 
-export function BankContent({ gold, balance, transactions }: Props) {
+export function BankContent({ money, balance, transactions }: Props) {
   const router  = useRouter();
   const [amount, setAmount] = useState("");
   const [busy,   setBusy]   = useState(false);
@@ -55,7 +55,7 @@ export function BankContent({ gold, balance, transactions }: Props) {
         <Card className="bg-slate-900 border-slate-800">
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">On Hand</p>
-            <p className="text-xl font-bold text-yellow-400 font-mono">💰 {gold.toLocaleString()}</p>
+            <p className="text-xl font-bold text-yellow-400 font-mono">💰 {money.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-900 border-slate-800">
@@ -83,7 +83,7 @@ export function BankContent({ gold, balance, transactions }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => act("deposit")}
-              disabled={busy || num <= 0 || num > gold}
+              disabled={busy || num <= 0 || num > money}
               className="h-9 text-sm font-semibold rounded bg-green-800 hover:bg-green-700 text-white disabled:opacity-40 transition-colors"
             >
               {busy ? "…" : "Deposit ↓"}

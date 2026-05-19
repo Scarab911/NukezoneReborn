@@ -16,15 +16,13 @@ export default async function MilitaryPage() {
   });
   if (!nation) redirect("/setup");
 
-  // All other active nations
   const targets = await prisma.nation.findMany({
-    where:   { worldId: "world_01", status: { in: ["ACTIVE"] }, NOT: { playerId: session.user.id } },
-    select:  { id: true, name: true, color: true, hp: true, maxHp: true, totalUnits: true },
+    where:   { worldId: "world_01", status: "ACTIVE", NOT: { playerId: session.user.id } },
+    select:  { id: true, name: true, color: true, totalUnits: true, status: true },
     orderBy: { name: "asc" },
     take:    50,
   });
 
-  // Flatten own units
   const totalUnits: Record<string, number> = {};
   for (const army of nation.armies) {
     for (const unit of army.units) {
@@ -35,9 +33,15 @@ export default async function MilitaryPage() {
   return (
     <MilitaryContent
       myNationId={nation.id}
+      turns={nation.turns}
       totalUnits={totalUnits}
-      gold={nation.resource?.gold ?? 0}
-      targets={targets}
+      targets={targets.map((t) => ({
+        id:         t.id,
+        name:       t.name,
+        color:      t.color,
+        totalUnits: t.totalUnits,
+        status:     t.status,
+      }))}
     />
   );
 }

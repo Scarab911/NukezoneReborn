@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield, Sword, Zap, TrendingUp } from "lucide-react";
+import { TrendingUp, Sword, Zap, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,17 +9,20 @@ interface Props {
   nation: {
     name:     string;
     status:   string;
-    hp:       number;
-    maxHp:    number;
+    turns:    number;
+    maxTurns: number;
+    totalUnits: number;
+    minsToNextTurn: number;
     armies:   number;
     spyUnits: number;
+    battles:  number;
   };
   morale:    number;
-  resources: { gold: number; food: number; steel: number; energy: number };
+  resources: { money: number; land: number; population: number; energy: number };
 }
 
 export function DashboardContent({ nation, morale, resources }: Props) {
-  const hpPct = Math.round((nation.hp / nation.maxHp) * 100);
+  const turnPct = Math.round((nation.turns / nation.maxTurns) * 100);
 
   return (
     <div className="space-y-6">
@@ -31,22 +34,42 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </div>
         <Badge
           variant={nation.status === "ACTIVE" ? "outline" : "destructive"}
-          className={nation.status === "ACTIVE" ? "border-green-700 text-green-400" : ""}
+          className={nation.status === "ACTIVE" ? "border-green-700 text-green-400" : nation.status === "PROTECTED" ? "border-blue-700 text-blue-400" : ""}
         >
           {nation.status}
         </Badge>
       </div>
 
-      {/* Stat cards */}
+      {/* Turn display */}
+      <Card className="bg-slate-900 border-slate-800 border-purple-900/30">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-purple-300 font-semibold text-sm">⚡ Turns</span>
+            <div className="text-right">
+              <span className="text-purple-400 font-bold font-mono text-lg">{nation.turns}</span>
+              <span className="text-slate-500 text-sm"> / {nation.maxTurns}</span>
+            </div>
+          </div>
+          <Progress value={turnPct} className="h-2 bg-slate-700 [&>div]:bg-purple-500" />
+          {nation.turns < nation.maxTurns && (
+            <p className="text-slate-500 text-xs mt-1.5">
+              Next turn in {nation.minsToNextTurn} min · 1 turn / 5 min
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="HP" value={`${nation.hp.toLocaleString()} / ${nation.maxHp.toLocaleString()}`}
-          icon={<Shield className="w-4 h-4 text-green-400" />}
-          bar={<Progress value={hpPct} className="h-1.5 mt-2 bg-slate-700 [&>div]:bg-green-500" />} />
         <StatCard label="Morale" value={`${morale}%`}
           icon={<TrendingUp className="w-4 h-4 text-yellow-400" />}
           bar={<Progress value={morale} className="h-1.5 mt-2 bg-slate-700 [&>div]:bg-yellow-500" />} />
-        <StatCard label="Armies"    value={nation.armies.toString()}   icon={<Sword className="w-4 h-4 text-red-400"    />} />
-        <StatCard label="Spy Units" value={nation.spyUnits.toString()} icon={<Zap   className="w-4 h-4 text-purple-400" />} />
+        <StatCard label="Units" value={nation.totalUnits.toLocaleString()}
+          icon={<Sword className="w-4 h-4 text-red-400" />} />
+        <StatCard label="Battles Fought" value={nation.battles.toString()}
+          icon={<Zap className="w-4 h-4 text-orange-400" />} />
+        <StatCard label="Spy Units" value={nation.spyUnits.toString()}
+          icon={<Users className="w-4 h-4 text-purple-400" />} />
       </div>
 
       {/* Resources */}
@@ -56,10 +79,10 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <ResourceRow emoji="💰" label="Gold"   value={resources.gold}   color="text-yellow-400" />
-            <ResourceRow emoji="🌾" label="Food"   value={resources.food}   color="text-green-400"  />
-            <ResourceRow emoji="⚙️" label="Steel"  value={resources.steel}  color="text-slate-300"  />
-            <ResourceRow emoji="⚡" label="Energy" value={resources.energy} color="text-blue-400"   />
+            <ResourceRow emoji="💰" label="Money"      value={resources.money}      color="text-yellow-400" />
+            <ResourceRow emoji="🌍" label="Land"       value={resources.land}       color="text-green-400"  />
+            <ResourceRow emoji="👥" label="Population" value={resources.population} color="text-blue-300"   />
+            <ResourceRow emoji="⚡" label="Energy"     value={resources.energy}     color="text-blue-400"   />
           </div>
         </CardContent>
       </Card>
@@ -71,7 +94,7 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </CardHeader>
         <CardContent>
           <p className="text-slate-500 text-sm text-center py-6">
-            No recent activity. Launch an attack or start research to see events here.
+            No recent activity. Use your turns to attack, build, or research.
           </p>
         </CardContent>
       </Card>

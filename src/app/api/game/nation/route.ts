@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { STARTING } from "@/lib/game-constants";
+import { ECONOMY, TURNS } from "@/lib/game-constants";
+import { syncTurns } from "@/server/game-engine/turns";
 
 const CreateNationSchema = z.object({
   nationName: z.string().min(2).max(32).trim(),
@@ -14,76 +15,63 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const nation = await prisma.nation.findUnique({
-    where: { playerId: session.user.id },
+    where:   { playerId: session.user.id },
     include: { resource: true, morale: true },
   });
 
   if (!nation) return NextResponse.json({ nation: null });
-  return NextResponse.json({ nation });
+
+  // Sync turns on every fetch
+  await syncTurns(nation.id);
+  const fresh = await prisma.nation.findUniqueOrThrow({ where: { id: nation.id } });
+
+  return NextResponse.json({ nation: { ...nation, turns: fresh.turns, turnsRegenAt: fresh.turnsRegenAt } });
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // One nation per player
   const existing = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
   if (existing) return NextResponse.json({ error: "Nation already exists." }, { status: 409 });
 
   const body: unknown = await req.json();
   const parsed = CreateNationSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input.", details: parsed.error.flatten() }, { status: 400 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: "Invalid input." }, { status: 400 });
 
   const { nationName, color } = parsed.data;
 
-  // Check name uniqueness within world
-  const nameTaken = await prisma.nation.findFirst({
-    where: { name: nationName, worldId: "world_01" },
-  });
+  const nameTaken = await prisma.nation.findFirst({ where: { name: nationName, worldId: "world_01" } });
   if (nameTaken) return NextResponse.json({ error: "Nation name already taken." }, { status: 409 });
 
-  // Create nation + all dependent records atomically
   const nation = await prisma.$transaction(async (tx) => {
     const n = await tx.nation.create({
       data: {
-        worldId:  "world_01",
-        playerId: session.user!.id,
-        name:     nationName,
+        worldId:      "world_01",
+        playerId:     session.user!.id,
+        name:         nationName,
         color,
-        hp:       STARTING.HP,
-        maxHp:    STARTING.HP,
-        status:   "PROTECTED",
+        status:       "PROTECTED",
+        turns:        TURNS.STARTING_TURNS,
+        maxTurns:     TURNS.MAX_TURNS,
+        turnsRegenAt: new Date(),
       },
     });
 
     await tx.resource.create({
       data: {
-        nationId: n.id,
-        gold:     STARTING.GOLD,
-        food:     STARTING.FOOD,
-        steel:    STARTING.STEEL,
-        energy:   STARTING.ENERGY,
+        nationId:   n.id,
+        money:      ECONOMY.STARTING_MONEY,
+        land:       ECONOMY.STARTING_LAND,
+        population: ECONOMY.STARTING_POPULATION,
+        energy:     ECONOMY.STARTING_ENERGY,
       },
     });
 
-    await tx.moraleRecord.create({
-      data: { nationId: n.id, morale: STARTING.MORALE },
-    });
-
-    await tx.bankAccount.create({
-      data: { nationId: n.id, balance: 0 },
-    });
-
-    await tx.cIRating.create({
-      data: { nationId: n.id, rating: 10 },
-    });
-
-    // Default stationed army
-    await tx.army.create({
-      data: { nationId: n.id, name: "Home Guard", status: "STATIONED" },
-    });
+    await tx.moraleRecord.create({ data: { nationId: n.id, morale: ECONOMY.STARTING_MORALE } });
+    await tx.bankAccount.create({ data: { nationId: n.id, balance: 0 } });
+    await tx.cIRating.create({ data: { nationId: n.id, rating: 10 } });
+    await tx.army.create({ data: { nationId: n.id, name: "Home Guard", status: "STATIONED" } });
 
     return n;
   });

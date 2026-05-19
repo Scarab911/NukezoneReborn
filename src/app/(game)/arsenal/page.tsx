@@ -25,7 +25,6 @@ export default async function ArsenalPage() {
     }),
   ]);
 
-  // Flatten owned units
   const ownedUnits: Record<string, number> = {};
   for (const army of armies) {
     for (const unit of army.units) {
@@ -35,26 +34,26 @@ export default async function ArsenalPage() {
 
   return (
     <ArsenalContent
-      gold={nation.resource?.gold   ?? 0}
-      steel={nation.resource?.steel ?? 0}
+      money={nation.resource?.money ?? 0}
+      turns={nation.turns}
       ownedUnits={ownedUnits}
       unitTypes={unitTypes.map((u) => ({
-        id:           u.id,
-        name:         u.name,
-        slug:         u.slug,
-        attack:       u.attack,
-        defense:      u.defense,
-        speed:        u.speed,
-        goldCost:     u.goldCost,
-        steelCost:    u.steelCost,
-        trainTimeSec: u.trainTimeSec,
+        id:          u.id,
+        name:        u.name,
+        slug:        u.slug,
+        category:    u.category,
+        attack:      u.attack,
+        defense:     u.defense,
+        moneyCost:   u.moneyCost,
+        upkeep:      u.upkeep,
         requiresTech: u.requiresTech,
+        sortOrder:   u.sortOrder,
       }))}
       trainingQueue={trainingQueue.map((t) => ({
-        id:           t.id,
-        unitTypeId:   t.unitTypeId,
-        quantity:     t.quantity,
-        completesAt:  t.completesAt.toISOString(),
+        id:          t.id,
+        unitTypeId:  t.unitTypeId,
+        quantity:    t.quantity,
+        completesAt: t.completesAt.toISOString(),
       }))}
     />
   );

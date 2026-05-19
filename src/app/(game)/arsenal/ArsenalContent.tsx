@@ -1,89 +1,102 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArsenalTrainForm } from "./ArsenalTrainForm";
 
-interface UnitTypeData {
-  id:           string;
-  name:         string;
-  slug:         string;
-  attack:       number;
-  defense:      number;
-  speed:        number;
-  goldCost:     number;
-  steelCost:    number;
-  trainTimeSec: number;
-  requiresTech: string | null;
-}
+type UnitCat = "GROUND" | "AIR" | "SEA" | "SPECIAL" | "STRATEGIC";
 
-interface TrainingJob {
-  id:          string;
-  unitTypeId:  string;
-  quantity:    number;
-  completesAt: string; // ISO string — serialisable from server
+interface UnitTypeData {
+  id: string; name: string; slug: string; category: string;
+  attack: number; defense: number; moneyCost: number; upkeep: number;
+  requiresTech: string | null; sortOrder: number;
 }
 
 interface Props {
-  gold:          number;
-  steel:         number;
+  money:         number;
+  turns:         number;
   ownedUnits:    Record<string, number>;
   unitTypes:     UnitTypeData[];
-  trainingQueue: TrainingJob[];
+  trainingQueue: Array<{ id: string; unitTypeId: string; quantity: number; completesAt: string }>;
 }
 
-export function ArsenalContent({ gold, steel, ownedUnits, unitTypes, trainingQueue }: Props) {
+const CAT_LABEL: Record<UnitCat, string> = {
+  GROUND: "⚔️ Ground", AIR: "✈️ Air", SEA: "🚢 Sea", SPECIAL: "🕵️ Special", STRATEGIC: "☢️ Strategic",
+};
+const CATS: UnitCat[] = ["GROUND", "AIR", "SEA", "SPECIAL", "STRATEGIC"];
+
+export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQueue }: Props) {
+  const [activeTab, setActiveTab] = useState<UnitCat>("GROUND");
+
+  const byCategory = Object.fromEntries(
+    CATS.map((c) => [c, unitTypes.filter((u) => u.category === c)]),
+  ) as Record<UnitCat, UnitTypeData[]>;
+
+  const visible = byCategory[activeTab] ?? [];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Arsenal</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Train and manage your military units</p>
+        <p className="text-slate-500 text-sm mt-0.5">Train your military forces</p>
       </div>
 
-      {/* Resources reminder */}
-      <div className="flex gap-4 text-xs font-mono">
-        <span className="text-yellow-400">💰 {gold.toLocaleString()} gold</span>
-        <span className="text-slate-300">⚙️ {steel.toLocaleString()} steel</span>
+      <div className="flex gap-2 text-xs font-mono">
+        <span className="text-yellow-400">💰 {money.toLocaleString()}</span>
+        <span className="text-purple-400">⚡ {turns} turns</span>
       </div>
 
       {/* Training queue */}
       {trainingQueue.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-2">
-          <p className="text-slate-200 text-sm font-medium mb-3">Training Queue</p>
+        <div className="bg-slate-900 border border-blue-900/40 rounded-lg p-3 space-y-1">
+          <p className="text-blue-300 text-xs font-semibold mb-2">⏳ Training Queue</p>
           {trainingQueue.map((job) => (
-            <div key={job.id} className="flex items-center justify-between text-sm">
-              <span className="text-slate-300">{job.quantity}× unit</span>
-              <span className="text-slate-500 text-xs">
-                {new Date(job.completesAt).toLocaleTimeString()}
-              </span>
+            <div key={job.id} className="flex justify-between text-xs text-slate-400">
+              <span>{job.quantity}× unit</span>
+              <span className="text-slate-500">{new Date(job.completesAt).toLocaleTimeString()}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Unit roster */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {unitTypes.map((unit) => {
+      {/* Category tabs */}
+      <div className="flex flex-wrap gap-1">
+        {CATS.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveTab(cat)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+              activeTab === cat
+                ? "bg-red-800 text-white"
+                : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+            }`}
+          >
+            {CAT_LABEL[cat]}
+          </button>
+        ))}
+      </div>
+
+      {/* Unit grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {visible.map((unit) => {
           const owned  = ownedUnits[unit.slug] ?? 0;
           const locked = !!unit.requiresTech;
 
           return (
-            <Card
-              key={unit.id}
-              className={`bg-slate-900 border-slate-800 ${locked ? "opacity-60" : ""}`}
-            >
+            <Card key={unit.id} className={`bg-slate-900 border-slate-800 ${locked ? "opacity-55" : ""}`}>
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="font-semibold text-slate-100">{unit.name}</p>
+                    <p className="font-semibold text-slate-100 text-sm">{unit.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Owned: <span className="text-slate-300 font-mono">{owned.toLocaleString()}</span>
                     </p>
                   </div>
                   {locked && (
-                    <Badge variant="outline" className="text-xs border-slate-700 text-slate-500">
-                      🔒 Requires research
+                    <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-500 shrink-0 ml-2">
+                      🔒 Requires tech
                     </Badge>
                   )}
                 </div>
@@ -91,33 +104,21 @@ export function ArsenalContent({ gold, steel, ownedUnits, unitTypes, trainingQue
                 <Separator className="bg-slate-800 mb-3" />
 
                 <div className="grid grid-cols-3 gap-2 text-xs text-center mb-3">
-                  <div>
-                    <p className="text-slate-500">ATK</p>
-                    <p className="text-red-400 font-bold">{unit.attack}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">DEF</p>
-                    <p className="text-blue-400 font-bold">{unit.defense}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">SPD</p>
-                    <p className="text-green-400 font-bold">{unit.speed}x</p>
-                  </div>
+                  <div><p className="text-slate-500">ATK</p><p className="text-red-400 font-bold">{unit.attack}</p></div>
+                  <div><p className="text-slate-500">DEF</p><p className="text-blue-400 font-bold">{unit.defense}</p></div>
+                  <div><p className="text-slate-500">UPKEEP</p><p className="text-yellow-400 font-bold">{unit.upkeep}/tick</p></div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
-                  <span>💰 {unit.goldCost.toLocaleString()} + ⚙️ {unit.steelCost}</span>
-                  <span>⏱ {formatTime(unit.trainTimeSec)}</span>
+                <div className="text-xs text-slate-500 mb-3">
+                  💰 {unit.moneyCost.toLocaleString()} per unit
                 </div>
 
                 {!locked && (
                   <ArsenalTrainForm
                     unitTypeId={unit.id}
                     unitName={unit.name}
-                    goldCost={unit.goldCost}
-                    steelCost={unit.steelCost}
-                    availableGold={gold}
-                    availableSteel={steel}
+                    moneyCost={unit.moneyCost}
+                    availableMoney={money}
                   />
                 )}
               </CardContent>
@@ -127,10 +128,4 @@ export function ArsenalContent({ gold, steel, ownedUnits, unitTypes, trainingQue
       </div>
     </div>
   );
-}
-
-function formatTime(secs: number): string {
-  if (secs < 60)   return `${secs}s`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  return `${Math.floor(secs / 3600)}h`;
 }

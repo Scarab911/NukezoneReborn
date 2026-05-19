@@ -4,22 +4,25 @@ import { prisma } from "@/lib/db";
 import { GameSidebar } from "@/components/layout/GameSidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { AlertBar } from "@/components/game/AlertBar";
+import { syncTurns } from "@/server/game-engine/turns";
 
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // Redirect to setup if player has no nation yet
   const nation = await prisma.nation.findUnique({
-    where: { playerId: session.user.id },
+    where:   { playerId: session.user.id },
     include: { resource: true },
   });
 
-  const isSetupRoute = false; // Setup page lives outside (game) group
+  if (!nation) redirect("/setup");
 
-  if (!nation && !isSetupRoute) {
-    redirect("/setup");
-  }
+  // Keep turns in sync on every game page load
+  await syncTurns(nation.id);
+  const fresh = await prisma.nation.findUniqueOrThrow({
+    where:  { id: nation.id },
+    select: { turns: true, maxTurns: true, turnsRegenAt: true },
+  });
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
@@ -27,11 +30,12 @@ export default async function GameLayout({ children }: { children: React.ReactNo
 
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar
-          nationName={nation?.name}
-          gold={nation?.resource?.gold}
-          food={nation?.resource?.food}
-          steel={nation?.resource?.steel}
-          energy={nation?.resource?.energy}
+          nationName={nation.name}
+          money={nation.resource?.money}
+          land={nation.resource?.land}
+          population={nation.resource?.population}
+          turns={fresh.turns}
+          maxTurns={fresh.maxTurns}
         />
         <AlertBar />
 

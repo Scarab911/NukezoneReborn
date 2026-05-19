@@ -15,7 +15,7 @@ export async function GET() {
   const nation = await prisma.nation.findUnique({
     where: { playerId: session.user.id },
     include: {
-      resource:   { select: { gold: true } },
+      resource:   { select: { money: true } },
       bankAccount: {
         include: {
           transactions: { orderBy: { createdAt: "desc" }, take: 20 },
@@ -27,7 +27,7 @@ export async function GET() {
   if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
 
   return NextResponse.json({
-    gold:        nation.resource?.gold        ?? 0,
+    money:       nation.resource?.money       ?? 0,
     balance:     nation.bankAccount?.balance  ?? 0,
     transactions: nation.bankAccount?.transactions ?? [],
   });
@@ -49,15 +49,15 @@ export async function POST(req: NextRequest) {
   });
   if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
 
-  const cash    = nation.resource?.gold     ?? 0;
+  const cash    = nation.resource?.money    ?? 0;
   const balance = nation.bankAccount?.balance ?? 0;
 
   if (action === "deposit") {
-    if (cash < amount) return NextResponse.json({ error: "Not enough gold" }, { status: 400 });
+    if (cash < amount) return NextResponse.json({ error: "Not enough money" }, { status: 400 });
     await prisma.$transaction([
       prisma.resource.update({
         where: { nationId: nation.id },
-        data:  { gold: { decrement: amount } },
+        data:  { money: { decrement: amount } },
       }),
       prisma.bankAccount.update({
         where: { nationId: nation.id },
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       }),
       prisma.resource.update({
         where: { nationId: nation.id },
-        data:  { gold: { increment: amount } },
+        data:  { money: { increment: amount } },
       }),
       prisma.bankTransaction.create({
         data: { accountId: nation.bankAccount!.id, type: "WITHDRAWAL", amount },
