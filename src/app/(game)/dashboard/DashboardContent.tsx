@@ -39,16 +39,21 @@ export function DashboardContent({ nation, morale, resources }: Props) {
 
   async function handleExplore() {
     setExploring(true);
-    const res = await fetch("/api/game/explore", { method: "POST" });
-    const data = await res.json() as {
-      landGained?: number; turnCost?: number; explorationCount?: number;
-      error?: string;
-    };
-    setExploring(false);
-    if (!res.ok) { toast.error(data.error ?? "Exploration failed"); return; }
-    toast.success(`+${data.landGained} land explored!`);
-    setExploreCount(data.explorationCount ?? exploreCount + 1);
-    router.refresh();
+    try {
+      const res  = await fetch("/api/game/explore", { method: "POST" });
+      const data = await res.json() as {
+        landGained?: number; turnCost?: number; explorationCount?: number;
+        error?: string;
+      };
+      if (!res.ok) { toast.error(data.error ?? "Exploration failed"); return; }
+      toast.success(`+${data.landGained} land explored!`);
+      setExploreCount(data.explorationCount ?? exploreCount + 1);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Exploration failed");
+    } finally {
+      setExploring(false);
+    }
   }
 
   // Run economy tick on mount + every 30s
