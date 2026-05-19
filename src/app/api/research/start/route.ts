@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   });
   if (active) return NextResponse.json({ error: "Research already in progress" }, { status: 409 });
 
-  if ((nation.resource?.gold ?? 0) < techNode.goldCost) {
+  if ((nation.resource?.money ?? 0) < techNode.goldCost) {
     return NextResponse.json({ error: "Not enough gold" }, { status: 400 });
   }
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   await prisma.$transaction([
     prisma.resource.update({
       where: { nationId: nation.id },
-      data:  { gold: { decrement: techNode.goldCost } },
+      data:  { money: { decrement: techNode.goldCost } },
     }),
     prisma.researchProgress.create({
       data: { nationId: nation.id, techNodeId, completesAt },

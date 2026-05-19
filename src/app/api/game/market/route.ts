@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const CreateOrderSchema = z.object({
   side:        z.enum(["BUY", "SELL"]),
-  resource:    z.enum(["GOLD", "STEEL", "FOOD", "ENERGY"]),
+  resource:    z.enum(["MONEY", "LAND", "ENERGY"]),
   quantity:    z.number().int().min(10).max(10_000),
   pricePerUnit: z.number().int().min(1).max(100_000),
 });
@@ -36,9 +36,8 @@ export async function GET() {
     openOrders,
     myOrders,
     resources: {
-      gold:   nation.resource?.gold   ?? 0,
-      steel:  nation.resource?.steel  ?? 0,
-      food:   nation.resource?.food   ?? 0,
+      money:  nation.resource?.money  ?? 0,
+      land:   nation.resource?.land   ?? 0,
       energy: nation.resource?.energy ?? 0,
     },
   });
@@ -68,11 +67,10 @@ export async function POST(req: NextRequest) {
 
   // For sell orders: lock the resource
   if (side === "SELL") {
-    const resourceField2 = resource.toLowerCase() as "gold" | "steel" | "food" | "energy";
-    const available = nation.resource?.[resourceField2] ?? 0;
+    const resourceField = resource.toLowerCase() as "money" | "land" | "energy";
+    const available = nation.resource?.[resourceField] ?? 0;
     if (available < quantity) return NextResponse.json({ error: `Not enough ${resource.toLowerCase()}` }, { status: 400 });
 
-    const resourceField = resource.toLowerCase() as "gold" | "steel" | "food" | "energy";
     await prisma.$transaction([
       prisma.resource.update({
         where: { nationId: nation.id },
@@ -83,14 +81,14 @@ export async function POST(req: NextRequest) {
       }),
     ]);
   } else {
-    // For buy orders: lock the gold
+    // For buy orders: lock money
     const totalCost = quantity * pricePerUnit;
-    if ((nation.resource?.gold ?? 0) < totalCost) return NextResponse.json({ error: "Not enough gold" }, { status: 400 });
+    if ((nation.resource?.money ?? 0) < totalCost) return NextResponse.json({ error: "Not enough money" }, { status: 400 });
 
     await prisma.$transaction([
       prisma.resource.update({
         where: { nationId: nation.id },
-        data:  { gold: { decrement: totalCost } },
+        data:  { money: { decrement: totalCost } },
       }),
       prisma.marketOrder.create({
         data: { nationId: nation.id, worldId: "world_01", side, resource, quantity, pricePerUnit },
@@ -122,16 +120,16 @@ export async function DELETE(req: NextRequest) {
   const refundAmount = Math.floor(
     order.side === "SELL"
       ? 0 // seller gets their resource back
-      : unfilledQty * order.pricePerUnit * 0.99, // buyer gets gold back minus fee
+      : unfilledQty * order.pricePerUnit * 0.99, // buyer gets money back minus fee
   );
 
-  const resourceField = order.resource.toLowerCase() as "gold" | "steel" | "food" | "energy";
+  const resourceField = order.resource.toLowerCase() as "money" | "land" | "energy";
 
   await prisma.$transaction([
     prisma.marketOrder.update({ where: { id: orderId }, data: { status: "CANCELLED" } }),
     order.side === "SELL"
       ? prisma.resource.update({ where: { nationId: nation.id }, data: { [resourceField]: { increment: unfilledQty } } })
-      : prisma.resource.update({ where: { nationId: nation.id }, data: { gold: { increment: refundAmount } } }),
+      : prisma.resource.update({ where: { nationId: nation.id }, data: { money: { increment: refundAmount } } }),
   ]);
 
   return NextResponse.json({ success: true });

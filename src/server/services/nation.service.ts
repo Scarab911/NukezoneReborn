@@ -35,9 +35,9 @@ export async function setNationStatus(
   await prisma.nation.update({ where: { id: nationId }, data: { status } });
 }
 
-export async function damageNation(nationId: string, damage: number): Promise<Nation> {
+export async function decrementUnits(nationId: string, count: number): Promise<Nation> {
   return prisma.nation.update({
     where: { id: nationId },
-    data: { hp: { decrement: Math.max(0, damage) } },
+    data: { totalUnits: { decrement: Math.max(0, count) } },
   });
 }

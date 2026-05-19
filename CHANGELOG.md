@@ -5,6 +5,43 @@ Format: `## [version or date] — Description`
 
 ---
 
+## [2026-05-15] — Major Redesign: Turn-Based Instant Combat
+
+- **Removed**: HP system, territory map, coordinates, travel time, ArmyMovement, food/steel resources
+- **Added**: Turn system (50 start, +1/5min, max 100), instant combat resolution (same HTTP response)
+- **Added**: 30 unit types across Ground/Air/Sea/Special/Strategic categories
+- **Added**: Building model (WAR_FACTORY, AIRFIELD, SHIPYARD, RESEARCH_LAB, POWER_PLANT, MISSILE_SILO, DEFENSE_TOWERS)
+- **Changed**: `gold` → `money`, removed `food`/`steel` from Resource model
+- **New engine**: `combat.ts` (seeded Mulberry32 RNG, instant resolver), `turns.ts` (regen + spend)
+- **New API**: `POST /api/military/attack` (replaces `/launch`), `POST /api/buildings`
+- **DB migration**: Applied via Supabase MCP (port 5432 blocked locally)
+- Updated all pages: dashboard (turns bar), arsenal (category tabs), military (instant result inline)
+- Updated TODO.md, SESSION_HANDOFF.md, AI_RULES.md comprehensively
+
+## [2026-05-14] — M4: Bank, Market, Alliances, Messages
+
+- Bank: deposit/withdraw with 2% fee, transaction history
+- Market: order book for money/land/energy, buy/sell orders, cancel with refund
+- Alliances: create/join, member roster, treasury display
+- Messages: inbox with all notification types, send diplomatic messages
+- Research auto-complete: polls every 10s, marks expired IN_PROGRESS as COMPLETED
+
+## [2026-05-13] — M3: Research, Rankings, Military, WebSocket
+
+- Research page: tech tree, live countdown timer, auto-complete
+- Rankings page: power score leaderboard with medals
+- Military page: nation list, instant attack launch
+- WebSocket client singleton: routes events to Zustand stores
+- Alert bar: red banner for incoming attacks
+
+## [2026-05-12] — M2: Auth, Dashboard, Arsenal, Nation Setup
+
+- Auth pages: /login, /register (dark military UI)
+- Nation setup flow: /setup → color picker → create nation
+- Dashboard: HP bar (now turns), morale, resources
+- Arsenal: unit list with training form
+- Seed data: GameWorld, UnitTypes, TechNodes
+
 ## [2026-05-09] — MMO Architecture Design (Phase 2)
 
 - Redesigned entire architecture as production-grade live-service MMO

@@ -15,31 +15,27 @@ export default async function RankingsPage() {
   const nations = await prisma.nation.findMany({
     where:   { worldId: "world_01", status: { in: ["ACTIVE", "PROTECTED"] } },
     select:  {
-      id: true, name: true, status: true, color: true,
-      hp: true, maxHp: true, totalUnits: true,
-      morale:   { select: { morale:  true } },
-      resource: { select: { gold:    true } },
+      id: true, name: true, status: true, color: true, totalUnits: true,
+      morale:   { select: { morale:      true } },
+      resource: { select: { money: true, land: true } },
       _count:   { select: { attackingBattles: true } },
     },
     orderBy: { totalUnits: "desc" },
-    take: 100,
+    take:    100,
   });
 
-  // Power score: units×10 + (hp/maxHp)×500
   const ranked = nations
     .map((n) => ({
       id:         n.id,
       name:       n.name,
       status:     n.status,
       color:      n.color,
-      hp:         n.hp,
-      maxHp:      n.maxHp,
       totalUnits: n.totalUnits,
       morale:     n.morale?.morale ?? 75,
-      gold:       n.resource?.gold  ?? 0,
+      land:       n.resource?.land  ?? 0,
       battles:    n._count.attackingBattles,
       isOwn:      n.id === myNation?.id,
-      score:      n.totalUnits * 10 + Math.round((n.hp / Math.max(1, n.maxHp)) * 500),
+      score:      n.totalUnits * 10 + (n.resource?.land ?? 0) * 5 + n._count.attackingBattles * 50,
     }))
     .sort((a, b) => b.score - a.score)
     .map((n, i) => ({ ...n, rank: i + 1 }));

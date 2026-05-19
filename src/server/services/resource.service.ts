@@ -7,66 +7,35 @@ export async function getResources(nationId: string): Promise<Resource | null> {
 
 export async function applyResourceDelta(
   nationId: string,
-  delta: Partial<Pick<Resource, "gold" | "food" | "steel" | "energy">>,
+  delta: Partial<Pick<Resource, "money" | "land" | "population" | "energy">>,
 ): Promise<Resource> {
   const data: Record<string, unknown> = {};
-  if (delta.gold  !== undefined) data.gold  = { increment: delta.gold  };
-  if (delta.food  !== undefined) data.food  = { increment: delta.food  };
-  if (delta.steel !== undefined) data.steel = { increment: delta.steel };
-  if (delta.energy!== undefined) data.energy= { increment: delta.energy};
-
+  if (delta.money      !== undefined) data.money      = { increment: delta.money };
+  if (delta.land       !== undefined) data.land       = { increment: delta.land };
+  if (delta.population !== undefined) data.population = { increment: delta.population };
+  if (delta.energy     !== undefined) data.energy     = { increment: delta.energy };
   return prisma.resource.update({ where: { nationId }, data });
 }
 
-export async function deductGold(
-  nationId: string,
-  amount: number,
-): Promise<Resource> {
+export async function deductMoney(nationId: string, amount: number): Promise<Resource> {
   const resource = await prisma.resource.findUniqueOrThrow({ where: { nationId } });
-  if (resource.gold < amount) throw new Error("Insufficient gold");
-  return prisma.resource.update({
-    where: { nationId },
-    data:  { gold: { decrement: amount } },
-  });
+  if (resource.money < amount) throw new Error("Insufficient money");
+  return prisma.resource.update({ where: { nationId }, data: { money: { decrement: amount } } });
 }
 
-// Atomic transfer — used by market, loot, alliance treasury
-export async function transferGold(
+export async function transferMoney(
   fromNationId: string,
-  toNationId: string,
-  amount: number,
-  note?: string,
+  toNationId:   string,
+  amount:       number,
+  note?:        string,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const sender = await tx.resource.findUniqueOrThrow({ where: { nationId: fromNationId } });
-    if (sender.gold < amount) throw new Error("Insufficient gold");
-
-    await tx.resource.update({ where: { nationId: fromNationId }, data: { gold: { decrement: amount } } });
-    await tx.resource.update({ where: { nationId: toNationId },   data: { gold: { increment: amount } } });
+    if (sender.money < amount) throw new Error("Insufficient money");
+    await tx.resource.update({ where: { nationId: fromNationId }, data: { money: { decrement: amount } } });
+    await tx.resource.update({ where: { nationId: toNationId },   data: { money: { increment: amount } } });
     await tx.transaction.create({
       data: { type: "TRANSFER", fromId: fromNationId, toId: toNationId, amount, note },
     });
   });
-}
-
-export async function enforceStorageCaps(
-  nationId: string,
-  landCount: number,
-  mineCount: number,
-): Promise<void> {
-  const caps = {
-    gold:  10_000 + landCount  * 500,
-    steel: 5_000  + mineCount  * 200,
-    food:  2_000  + landCount  * 100,
-  };
-
-  const r = await prisma.resource.findUniqueOrThrow({ where: { nationId } });
-  const data: Partial<Pick<Resource, "gold" | "steel" | "food">> = {};
-  if (r.gold  > caps.gold)  data.gold  = caps.gold;
-  if (r.steel > caps.steel) data.steel = caps.steel;
-  if (r.food  > caps.food)  data.food  = caps.food;
-
-  if (Object.keys(data).length > 0) {
-    await prisma.resource.update({ where: { nationId }, data });
-  }
 }

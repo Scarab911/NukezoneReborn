@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 type Side = "BUY" | "SELL";
-type Resource = "GOLD" | "STEEL" | "FOOD" | "ENERGY";
+type Resource = "MONEY" | "LAND" | "ENERGY";
 
 interface Order {
   id: string; side: Side; resource: Resource;
@@ -18,20 +18,20 @@ interface Order {
 }
 
 interface Props {
-  resources: { gold: number; steel: number; food: number; energy: number };
+  resources: { money: number; land: number; energy: number };
   openOrders: Order[];
   myOrders:   Order[];
 }
 
-const RESOURCES: Resource[] = ["GOLD", "STEEL", "FOOD", "ENERGY"];
+const RESOURCES: Resource[] = ["MONEY", "LAND", "ENERGY"];
 const RESOURCE_EMOJI: Record<Resource, string> = {
-  GOLD: "💰", STEEL: "⚙️", FOOD: "🌾", ENERGY: "⚡",
+  MONEY: "💰", LAND: "🌍", ENERGY: "⚡",
 };
 
 export function MarketContent({ resources, openOrders, myOrders }: Props) {
   const router = useRouter();
   const [side,     setSide]     = useState<Side>("BUY");
-  const [resource, setResource] = useState<Resource>("STEEL");
+  const [resource, setResource] = useState<Resource>("LAND");
   const [qty,      setQty]      = useState("100");
   const [price,    setPrice]    = useState("10");
   const [busy,     setBusy]     = useState(false);
@@ -75,9 +75,8 @@ export function MarketContent({ resources, openOrders, myOrders }: Props) {
 
       {/* Resources */}
       <div className="flex flex-wrap gap-3 text-xs font-mono">
-        <span className="text-yellow-400">💰 {resources.gold.toLocaleString()}</span>
-        <span className="text-slate-300">⚙️ {resources.steel.toLocaleString()}</span>
-        <span className="text-green-400">🌾 {resources.food.toLocaleString()}</span>
+        <span className="text-yellow-400">💰 {resources.money.toLocaleString()}</span>
+        <span className="text-green-400">🌍 {resources.land.toLocaleString()}</span>
         <span className="text-blue-400">⚡ {resources.energy.toLocaleString()}</span>
       </div>
 

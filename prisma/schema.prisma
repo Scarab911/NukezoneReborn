@@ -1,5 +1,4 @@
-// NukezoneReborn — Prisma Schema
-// All domain models in one file. Domain ownership documented in docs/DOMAIN_MODULES.md.
+// NukezoneReborn — Prisma Schema (Redesign: Turn-Based, Instant Combat)
 
 generator client {
   provider = "prisma-client-js"
@@ -10,7 +9,7 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH DOMAIN  (NextAuth v5 compatible)
+// AUTH DOMAIN
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Player {
@@ -45,9 +44,7 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
   user Player @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@unique([provider, providerAccountId])
 }
 
@@ -56,7 +53,6 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
   user Player @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -64,7 +60,6 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
 }
 
@@ -80,7 +75,6 @@ model UserProfile {
   honor       Int      @default(100)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
@@ -97,8 +91,8 @@ model GameWorld {
   startedAt  DateTime    @default(now())
   endedAt    DateTime?
 
-  nations     Nation[]
-  worldEvents WorldEvent[]
+  nations      Nation[]
+  worldEvents  WorldEvent[]
   marketOrders MarketOrder[]
   marketTrades MarketTrade[]
   priceHistory PriceHistory[]
@@ -108,7 +102,7 @@ model GameWorld {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NATION DOMAIN  (central entity — owned by Economy domain)
+// NATION DOMAIN — Turn-based, no HP, no map
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Nation {
@@ -117,40 +111,28 @@ model Nation {
   playerId    String       @unique
   name        String
   status      NationStatus @default(ACTIVE)
-  hp          Int          @default(1000)
-  maxHp       Int          @default(1000)
+  // Turn system — regenerates 1/5min, max 100
+  turns       Int          @default(50)
+  maxTurns    Int          @default(100)
+  turnsRegenAt DateTime    @default(now())
+  // Military
   totalUnits  Int          @default(0)
-  coordX      Int          @default(0)
-  coordY      Int          @default(0)
   color       String       @default("#22c55e")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  world       GameWorld    @relation(fields: [worldId], references: [id])
-  player      Player       @relation(fields: [playerId], references: [id])
+  world   GameWorld @relation(fields: [worldId], references: [id])
+  player  Player    @relation(fields: [playerId], references: [id])
 
-  // Economy
-  resource     Resource?
-  morale       MoraleRecord?
-  bankAccount  BankAccount?
-  upkeepLogs   UpkeepLog[]
-  sentTransactions     Transaction[] @relation("TxSender")
-  receivedTransactions Transaction[] @relation("TxReceiver")
+  resource      Resource?
+  morale        MoraleRecord?
+  bankAccount   BankAccount?
+  buildings     Building[]
+  armies        Army[]
 
-  // Territory
-  territories  Territory[]
-  ciRating     CIRating?
-
-  // Military
-  armies       Army[]
-
-  // Battle
   attackingBattles  Battle[] @relation("BattleAttacker")
   defendingBattles  Battle[] @relation("BattleDefender")
-  armyMovements     ArmyMovement[] @relation("MovementAttacker")
-  incomingMovements ArmyMovement[] @relation("MovementTarget")
 
-  // Espionage / Thief
   spyUnits          SpyUnit[]
   spyOpsInitiated   SpyOperation[] @relation("SpyInitiator")
   spyOpsTargeted    SpyOperation[] @relation("SpyTarget")
@@ -158,35 +140,31 @@ model Nation {
   thiefOpsInitiated ThiefOperation[] @relation("ThiefInitiator")
   thiefOpsTargeted  ThiefOperation[] @relation("ThiefTarget")
 
-  // Research
-  researchProjects ResearchProgress[]
-
-  // Notifications
-  notifications Notification[]
-
-  // Alliance
-  allianceMember AllianceMember?
-
-  // Anti-cheat
-  securityEvents SecurityEvent[]
+  researchProjects  ResearchProgress[]
+  notifications     Notification[]
+  allianceMember    AllianceMember?
+  securityEvents    SecurityEvent[]
+  sentTransactions      Transaction[] @relation("TxSender")
+  receivedTransactions  Transaction[] @relation("TxReceiver")
+  upkeepLogs        UpkeepLog[]
+  ciRating          CIRating?
 
   @@index([worldId, status])
   @@index([playerId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ECONOMY DOMAIN
+// ECONOMY DOMAIN — Simplified: Money, Land, Population, Energy
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Resource {
-  id        String   @id @default(cuid())
-  nationId  String   @unique
-  gold      Int      @default(5000)
-  food      Int      @default(1000)
-  steel     Int      @default(500)
-  energy    Int      @default(200)
-  updatedAt DateTime @updatedAt
-
+  id         String   @id @default(cuid())
+  nationId   String   @unique
+  money      Int      @default(5000)   // primary currency (was "gold")
+  land       Int      @default(100)    // territory scale, income base
+  population Int      @default(1000)   // income multiplier
+  energy     Int      @default(200)    // building support
+  updatedAt  DateTime @updatedAt
   nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
 }
 
@@ -194,7 +172,6 @@ model MoraleRecord {
   id       String @id @default(cuid())
   nationId String @unique
   morale   Int    @default(75)
-
   nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
 }
 
@@ -204,13 +181,11 @@ model Transaction {
   fromId    String?
   toId      String?
   amount    Int
-  resource  String          @default("gold")
+  resource  String          @default("money")
   note      String?
   createdAt DateTime        @default(now())
-
   from Nation? @relation("TxSender",   fields: [fromId], references: [id])
   to   Nation? @relation("TxReceiver", fields: [toId],   references: [id])
-
   @@index([fromId])
   @@index([toId])
   @@index([createdAt])
@@ -221,10 +196,22 @@ model UpkeepLog {
   nationId String
   goldCost Int
   tickTime DateTime @default(now())
-
   nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
-
   @@index([nationId, tickTime])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILDING DOMAIN — Multiplier-only, consume land
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Building {
+  id       String       @id @default(cuid())
+  nationId String
+  type     BuildingType
+  count    Int          @default(0)
+  nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  @@unique([nationId, type])
+  @@index([nationId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,7 +223,6 @@ model BankAccount {
   nationId  String   @unique
   balance   Int      @default(0)
   updatedAt DateTime @updatedAt
-
   nation       Nation            @relation(fields: [nationId], references: [id], onDelete: Cascade)
   transactions BankTransaction[]
   loans        Loan[]
@@ -248,9 +234,7 @@ model BankTransaction {
   type      BankTransactionType
   amount    Int
   createdAt DateTime            @default(now())
-
   account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
   @@index([accountId])
 }
 
@@ -262,63 +246,24 @@ model Loan {
   status    LoanStatus @default(ACTIVE)
   takenAt   DateTime   @default(now())
   dueAt     DateTime
-
   account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TERRITORY DOMAIN
-// ─────────────────────────────────────────────────────────────────────────────
-
-model Territory {
-  id            String      @id @default(cuid())
-  worldId       String
-  ownerNationId String?
-  coordX        Int
-  coordY        Int
-  type          TerrainType @default(PLAINS)
-  irradiated    Boolean     @default(false)
-  radiationLevel Float      @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  owner         Nation?         @relation(fields: [ownerNationId], references: [id])
-  radiationZones RadiationZone[]
-  battles       Battle[]
-
-  @@unique([worldId, coordX, coordY])
-  @@index([ownerNationId])
-}
-
-model RadiationZone {
-  id          String   @id @default(cuid())
-  territoryId String
-  intensity   Float    @default(1.0)
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-
-  territory Territory @relation(fields: [territoryId], references: [id])
-
-  @@index([territoryId, expiresAt])
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MILITARY DOMAIN
+// MILITARY DOMAIN — Units across Ground/Air/Sea/Special/Strategic
 // ─────────────────────────────────────────────────────────────────────────────
 
 model UnitType {
-  id           String  @id @default(cuid())
-  name         String  @unique
-  slug         String  @unique
-  speed        Float
+  id           String       @id @default(cuid())
+  name         String       @unique
+  slug         String       @unique
+  category     UnitCategory
   attack       Int
   defense      Int
-  goldUpkeep   Int
-  goldCost     Int
-  steelCost    Int
-  trainTimeSec Int
+  moneyCost    Int
+  upkeep       Int
   requiresTech String?
-  sortOrder    Int     @default(0)
+  sortOrder    Int          @default(0)
 
   units Unit[]
 }
@@ -328,11 +273,8 @@ model Army {
   nationId String
   name     String     @default("Army")
   status   ArmyStatus @default(STATIONED)
-
-  nation    Nation  @relation(fields: [nationId], references: [id], onDelete: Cascade)
-  units     Unit[]
-  movements ArmyMovement[]
-
+  nation   Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
+  units    Unit[]
   @@index([nationId])
 }
 
@@ -341,10 +283,8 @@ model Unit {
   armyId     String
   unitTypeId String
   quantity   Int    @default(0)
-
   army     Army     @relation(fields: [armyId],     references: [id], onDelete: Cascade)
   unitType UnitType @relation(fields: [unitTypeId], references: [id])
-
   @@unique([armyId, unitTypeId])
 }
 
@@ -355,33 +295,11 @@ model UnitTraining {
   quantity    Int
   startedAt   DateTime @default(now())
   completesAt DateTime
-
   @@index([nationId, completesAt])
 }
 
-model ArmyMovement {
-  id                String         @id @default(cuid())
-  worldId           String
-  armyId            String
-  attackerNationId  String
-  targetNationId    String
-  targetTerritoryId String?
-  status            MovementStatus @default(MOVING)
-  launchedAt        DateTime       @default(now())
-  eta               DateTime
-  battleId          String?        @unique
-
-  army           Army    @relation(fields: [armyId],           references: [id])
-  attackerNation Nation  @relation("MovementAttacker", fields: [attackerNationId], references: [id])
-  targetNation   Nation  @relation("MovementTarget",   fields: [targetNationId],   references: [id])
-  battle         Battle? @relation(fields: [battleId], references: [id])
-
-  @@index([worldId, status, eta])
-  @@index([targetNationId, status])
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// BATTLE DOMAIN
+// BATTLE DOMAIN — Instant resolution, no travel time
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Battle {
@@ -389,23 +307,21 @@ model Battle {
   worldId          String
   attackerNationId String
   defenderNationId String
-  targetTerritoryId String?
   type             BattleType   @default(CONVENTIONAL)
-  status           BattleStatus @default(PENDING)
+  status           BattleStatus @default(RESOLVED)  // always resolved instantly
+  winner           String?      // 'ATTACKER' | 'DEFENDER'
   seed             Int
-  winner           String?
+  landGained       Int          @default(0)
+  moneyStolen      Int          @default(0)
+  turnsCost        Int          @default(1)
   createdAt        DateTime     @default(now())
-  resolvedAt       DateTime?
 
-  attackerNation Nation     @relation("BattleAttacker", fields: [attackerNationId], references: [id])
-  defenderNation Nation     @relation("BattleDefender", fields: [defenderNationId], references: [id])
-  territory      Territory? @relation(fields: [targetTerritoryId], references: [id])
-  movement       ArmyMovement?
+  attackerNation Nation @relation("BattleAttacker", fields: [attackerNationId], references: [id])
+  defenderNation Nation @relation("BattleDefender", fields: [defenderNationId], references: [id])
   report         BattleReport?
   casualties     Casualty[]
 
-  @@index([worldId, status])
-  @@index([attackerNationId])
+  @@index([worldId, attackerNationId])
   @@index([defenderNationId])
 }
 
@@ -414,9 +330,7 @@ model BattleReport {
   battleId  String   @unique
   payload   Json
   createdAt DateTime @default(now())
-
   battle Battle @relation(fields: [battleId], references: [id])
-
   @@index([createdAt])
 }
 
@@ -426,9 +340,7 @@ model Casualty {
   nationId   String
   unitTypeId String
   count      Int
-
   battle Battle @relation(fields: [battleId], references: [id])
-
   @@index([battleId])
 }
 
@@ -448,9 +360,7 @@ model MarketOrder {
   status       OrderStatus  @default(OPEN)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@index([worldId, resource, side, status, pricePerUnit, createdAt])
   @@index([nationId, status])
 }
@@ -464,9 +374,7 @@ model MarketTrade {
   quantity    Int
   price       Int
   createdAt   DateTime     @default(now())
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@index([worldId, resource, createdAt])
 }
 
@@ -480,11 +388,8 @@ model PriceHistory {
   close    Int
   volume   Int
   candleAt DateTime
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@unique([worldId, resource, candleAt])
-  @@index([worldId, resource, candleAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -498,13 +403,11 @@ model Alliance {
   tag       String
   status    AllianceStatus @default(ACTIVE)
   createdAt DateTime       @default(now())
-
   world    GameWorld @relation(fields: [worldId], references: [id])
   members  AllianceMember[]
   outboundTreaties AllianceTreaty[] @relation("TreatyOwner")
   inboundTreaties  AllianceTreaty[] @relation("TreatyTarget")
   treasury AllianceTreasury?
-
   @@index([worldId, status])
 }
 
@@ -514,7 +417,6 @@ model AllianceMember {
   nationId   String       @unique
   role       AllianceRole @default(MEMBER)
   joinedAt   DateTime     @default(now())
-
   alliance Alliance @relation(fields: [allianceId], references: [id])
   nation   Nation   @relation(fields: [nationId],   references: [id])
 }
@@ -523,16 +425,13 @@ model AllianceTreaty {
   id               String       @id @default(cuid())
   allianceId       String
   targetAllianceId String?
-  targetNationId   String?
   type             TreatyType
   status           TreatyStatus @default(PROPOSED)
   proposedAt       DateTime     @default(now())
   acceptedAt       DateTime?
   expiresAt        DateTime?
-
   alliance       Alliance  @relation("TreatyOwner",  fields: [allianceId],       references: [id])
   targetAlliance Alliance? @relation("TreatyTarget", fields: [targetAllianceId], references: [id])
-
   @@index([allianceId, status])
 }
 
@@ -541,7 +440,6 @@ model AllianceTreasury {
   allianceId String   @unique
   gold       Int      @default(0)
   updatedAt  DateTime @updatedAt
-
   alliance Alliance @relation(fields: [allianceId], references: [id])
 }
 
@@ -561,7 +459,6 @@ model TechNode {
   bonusType       String?
   bonusValue      Float?
   sortOrder       Int          @default(0)
-
   prerequisite     TechNode?  @relation("TechPrereq", fields: [prerequisiteId], references: [id])
   unlocks          TechNode[] @relation("TechPrereq")
   researchProjects ResearchProgress[]
@@ -574,10 +471,8 @@ model ResearchProgress {
   status      ResearchStatus @default(IN_PROGRESS)
   startedAt   DateTime       @default(now())
   completesAt DateTime
-
   nation   Nation   @relation(fields: [nationId],  references: [id])
   techNode TechNode @relation(fields: [techNodeId], references: [id])
-
   @@unique([nationId, techNodeId])
   @@index([nationId, status, completesAt])
 }
@@ -593,10 +488,8 @@ model SpyUnit {
   status            SpyStatus @default(IDLE)
   missionsCompleted Int       @default(0)
   createdAt         DateTime  @default(now())
-
   nation     Nation         @relation(fields: [nationId], references: [id], onDelete: Cascade)
   operations SpyOperation[]
-
   @@index([nationId, status])
 }
 
@@ -612,14 +505,11 @@ model SpyOperation {
   success           Boolean?
   detected          Boolean?
   payload           Json?
-
   spyUnit         SpyUnit @relation(fields: [spyUnitId],         references: [id])
   initiatorNation Nation  @relation("SpyInitiator", fields: [initiatorNationId], references: [id])
   targetNation    Nation  @relation("SpyTarget",    fields: [targetNationId],    references: [id])
   report          SpyReport?
-
   @@index([status, scheduledAt])
-  @@index([initiatorNationId, targetNationId])
 }
 
 model SpyReport {
@@ -630,9 +520,7 @@ model SpyReport {
   read        Boolean   @default(false)
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
-
   operation SpyOperation @relation(fields: [operationId], references: [id])
-
   @@index([nationId, read])
 }
 
@@ -641,7 +529,6 @@ model CIRating {
   nationId  String   @unique
   rating    Int      @default(10)
   updatedAt DateTime @updatedAt
-
   nation Nation @relation(fields: [nationId], references: [id])
 }
 
@@ -655,10 +542,8 @@ model ThiefUnit {
   agility   Int         @default(1)
   status    ThiefStatus @default(IDLE)
   createdAt DateTime    @default(now())
-
   nation     Nation           @relation(fields: [nationId], references: [id], onDelete: Cascade)
   operations ThiefOperation[]
-
   @@index([nationId, status])
 }
 
@@ -674,13 +559,10 @@ model ThiefOperation {
   success           Boolean?
   detected          Boolean?
   amountStolen      Int?
-
-  thiefUnit       ThiefUnit @relation(fields: [thiefUnitId],       references: [id])
+  thiefUnit       ThiefUnit @relation(fields: [thiefUnitId], references: [id])
   initiatorNation Nation    @relation("ThiefInitiator", fields: [initiatorNationId], references: [id])
   targetNation    Nation    @relation("ThiefTarget",    fields: [targetNationId],    references: [id])
-
   @@index([status, scheduledAt])
-  @@index([initiatorNationId, targetNationId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -694,9 +576,7 @@ model Notification {
   payload   Json
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
-
   nation Nation @relation(fields: [nationId], references: [id])
-
   @@index([nationId, read, createdAt])
 }
 
@@ -707,7 +587,6 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-
   @@index([nationId])
 }
 
@@ -723,9 +602,7 @@ model WorldEvent {
   description String
   startedAt   DateTime         @default(now())
   endsAt      DateTime?
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@index([worldId, status])
 }
 
@@ -740,9 +617,7 @@ model RankingSnapshot {
   score     Int
   rank      Int
   snappedAt DateTime @default(now())
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@index([worldId, snappedAt])
   @@index([worldId, score])
 }
@@ -757,7 +632,6 @@ model BehaviorScore {
   score     Int      @default(0)
   signals   Json     @default("[]")
   updatedAt DateTime @updatedAt
-
   player Player @relation(fields: [playerId], references: [id])
 }
 
@@ -768,9 +642,7 @@ model SecurityEvent {
   type      String
   details   Json?
   createdAt DateTime @default(now())
-
   nation Nation? @relation(fields: [nationId], references: [id])
-
   @@index([playerId, createdAt])
 }
 
@@ -781,12 +653,11 @@ model Ban {
   reason    String
   expiresAt DateTime?
   createdAt DateTime  @default(now())
-
   player Player @relation(fields: [playerId], references: [id])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUDIT LOG  (append-only — never updated)
+// AUDIT LOG
 // ─────────────────────────────────────────────────────────────────────────────
 
 model GameLog {
@@ -795,11 +666,8 @@ model GameLog {
   eventType String
   payload   Json
   timestamp DateTime @default(now())
-
   world GameWorld @relation(fields: [worldId], references: [id])
-
   @@index([worldId, timestamp])
-  @@index([timestamp])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -831,16 +699,12 @@ enum ArmyStatus {
   IN_BATTLE
 }
 
-enum MovementStatus {
-  MOVING
-  ARRIVED
-  CANCELLED
-}
-
 enum BattleType {
   CONVENTIONAL
   NUCLEAR
-  TACTICAL_NUKE
+  CHEMICAL
+  BIOCHEMICAL
+  EMP
 }
 
 enum BattleStatus {
@@ -850,13 +714,22 @@ enum BattleStatus {
   FORCED_DRAW
 }
 
-enum TerrainType {
-  PLAINS
-  MOUNTAINS
-  DESERT
-  FOREST
-  COASTAL
-  NUCLEAR_WASTELAND
+enum BuildingType {
+  WAR_FACTORY
+  AIRFIELD
+  SHIPYARD
+  RESEARCH_LAB
+  POWER_PLANT
+  MISSILE_SILO
+  DEFENSE_TOWERS
+}
+
+enum UnitCategory {
+  GROUND
+  AIR
+  SEA
+  SPECIAL
+  STRATEGIC
 }
 
 enum OrderSide {
@@ -872,9 +745,8 @@ enum OrderStatus {
 }
 
 enum ResourceType {
-  GOLD
-  STEEL
-  FOOD
+  MONEY
+  LAND
   ENERGY
 }
 
@@ -888,6 +760,7 @@ enum TransactionType {
   RESEARCH_COST
   TRAINING_COST
   UPKEEP
+  BUILDING_COST
 }
 
 enum BankTransactionType {
@@ -978,11 +851,9 @@ enum ThiefStatus {
 }
 
 enum ThiefOpType {
-  STEAL_GOLD
-  STEAL_STEEL
-  STEAL_FOOD
-  SABOTAGE_MINE
-  SABOTAGE_FARM
+  STEAL_MONEY
+  STEAL_LAND
+  SABOTAGE_FACTORY
   SABOTAGE_PLANT
   INCITE_RIOT
   ASSASSINATE

@@ -24,7 +24,7 @@ export default async function ResearchPage() {
 
   return (
     <ResearchContent
-      gold={nation.resource?.gold ?? 0}
+      gold={nation.resource?.money ?? 0}
       techNodes={techNodes.map((n) => ({
         id:            n.id,
         name:          n.name,
