@@ -157,11 +157,13 @@ function ExplorePanel({
   onExplore: () => void;
   busy: boolean;
 }) {
-  const { turnCost, landGained } = calcExplorePreview(explorationCount);
-  const { landGained: nextLand }  = calcExplorePreview(explorationCount + 1);
-  const efficiency = landGained / turnCost;        // land per turn
+  const count = explorationCount ?? 0;
+  const { turnCost, landGained }     = calcExplorePreview(count);
+  const { turnCost: nextCost, landGained: nextLand } = calcExplorePreview(count + 1);
+  const efficiency = turnCost > 0 ? landGained / turnCost : 0;
   const lowValue   = efficiency < 50;
   const canAfford  = turns >= turnCost;
+  const plural     = (n: number) => n !== 1 ? "s" : "";
 
   return (
     <Card className="bg-slate-900 border-slate-800">
@@ -171,7 +173,7 @@ function ExplorePanel({
             <p className="text-slate-200 font-semibold text-sm mb-0.5">🏔 Explore Land</p>
             <p className="text-slate-500 text-xs">
               Gain <span className="text-green-400 font-mono font-bold">+{landGained}</span> land
-              for <span className="text-purple-400 font-mono font-bold">{turnCost}</span> turn{turnCost !== 1 ? "s" : ""}
+              for <span className="text-purple-400 font-mono font-bold">{turnCost}</span> turn{plural(turnCost)}
             </p>
             {lowValue && (
               <p className="text-xs text-amber-600 mt-1">
@@ -179,7 +181,7 @@ function ExplorePanel({
               </p>
             )}
             <p className="text-xs text-slate-600 mt-1">
-              Next: +{nextLand} land ({1 + Math.floor((explorationCount + 1) / 2)} turn{1 + Math.floor((explorationCount + 1) / 2) !== 1 ? "s" : ""})
+              Next: +{nextLand} land ({nextCost} turn{plural(nextCost)})
             </p>
           </div>
           <button
@@ -187,7 +189,7 @@ function ExplorePanel({
             disabled={busy || !canAfford}
             className="shrink-0 px-4 py-2 rounded bg-green-800 hover:bg-green-700 text-white text-xs font-semibold transition-colors disabled:opacity-40"
           >
-            {busy ? "Exploring…" : !canAfford ? `Need ${turnCost} turn${turnCost !== 1 ? "s" : ""}` : "Explore"}
+            {busy ? "Exploring…" : !canAfford ? `Need ${turnCost} turn${plural(turnCost)}` : "Explore"}
           </button>
         </div>
       </CardContent>

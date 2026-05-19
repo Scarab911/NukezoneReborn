@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         armies:    nation._count.armies,
         spyUnits:  nation._count.spyUnits,
         battles:   nation._count.attackingBattles,
-        explorationCount: nation.explorationCount,
+        explorationCount: nation.explorationCount ?? 0,
       }}
       morale={nation.morale?.morale ?? 75}
       resources={{
