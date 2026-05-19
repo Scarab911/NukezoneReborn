@@ -4,86 +4,115 @@
 
 ---
 
-## Session: 2026-05-14 — M2 continued (services, engine, stores, arsenal)
+## Session: 2026-05-15 — Major Redesign (Turn-Based + Instant Combat)
 
-### What Was Done (this session)
-- Updated SESSION_HANDOFF.md + TODO.md to reflect actual state
-- Built TanStack Query + Zustand providers (`Providers.tsx`)
-- Built domain services: `nation.service.ts`, `resource.service.ts`, `morale.service.ts`
-- Built economy engine: `src/server/game-engine/resources.ts`
-- Built Zustand stores: `useGameStore.ts`, `useUIStore.ts`
-- Built Arsenal page: unit list + training flow
-- Added WebSocket event types: `src/types/socket.ts`
-- Wired dashboard to TanStack Query polling
+### What Was Done
+- Completely redesigned game model per new spec
+- Prisma schema rewritten: removed HP, territory, ArmyMovement; added turns, Building, UnitCategory
+- DB migration applied via Supabase MCP (port 5432 still blocked by ISP)
+- 30 unit types seeded (Ground/Air/Sea/Special/Strategic) + 13 TechNodes
+- New engine files: `combat.ts` (instant seeded-RNG resolver), `turns.ts` (regen system)
+- Updated all pages and API routes for new resource model (gold→money, removed food/steel)
+- Deleted old `/api/military/launch`, added `/api/military/attack` (instant)
+- Added `/api/buildings` route
+- Updated TODO.md, SESSION_HANDOFF.md, AI_RULES.md comprehensively
 
-### Current State
-**M2 is ~60% complete.** App is runnable end-to-end:
-- ✅ Landing page (`/`)
-- ✅ Register + Login (`/register`, `/login`)
-- ✅ Nation setup (`/setup`)
-- ✅ Dashboard with live stats (`/dashboard`)
-- ✅ Arsenal page (`/arsenal`) — unit list + train
-- ✅ Service layer (nation, resource, morale)
-- ✅ Economy engine (income/upkeep formulas)
-- ✅ TanStack Query + Zustand providers wired
-- ❌ Economy tick running (Redis required locally)
-- ❌ Military page (attack flow)
-- ❌ Battle engine
-- ❌ Research page
-- ❌ All M3–M6 features
+### Current State — What Works End-to-End
+
+```
+/ (landing)          ✅ Dark UI, logged-in redirect
+/register            ✅ Creates Player + profile
+/login               ✅ Credentials auth
+/setup               ✅ Create nation (name + color picker)
+/dashboard           ✅ Turns bar, morale, money/land/pop/energy
+/arsenal             ✅ 30 units in 5 tabs, instant training (deducts money)
+/research            ✅ Tech tree, live countdown, auto-complete
+/military            ✅ Target list, instant attack, battle report shown inline
+/rankings            ✅ Power score leaderboard
+/bank                ✅ Deposit/withdraw, 2% fee, transaction history
+/market              ✅ Buy/sell orders (money/land/energy)
+/alliances           ✅ Create/join, member roster
+/messages            ✅ Inbox + send diplomatic messages
+```
 
 ### Current Focus
-**M2 — Core Game Loop (finishing)**
+**M3 — Polish & Completeness**
 
-Next tasks in priority order:
-1. Military page + unit training API (`POST /api/military/train`)
-2. Nation API polling with TanStack Query on dashboard
-3. Economy tick wired up (stub that runs without Redis for dev)
-4. Battle engine seeded-RNG + basic resolve
+### Immediate Next Actions (priority order)
 
-### Architecture Decisions Locked In
+1. **Economy tick** — wire up passive income on dashboard load (like research auto-complete):
+   ```
+   POST /api/tick/economy → calculates income since last tick → updates money + morale
+   ```
+
+2. **Buildings page** — `/buildings` with `BuildingsContent.tsx`:
+   - Show 7 building types, current count, cost (money + land), effect
+   - Connect to existing `POST /api/buildings`
+
+3. **Fix 404 sidebar links**:
+   - `/defense` → simple stub page
+   - `/settings` → simple stub page
+
+4. **Label fixes**:
+   - Research "goldCost" displayed as "money" in UI
+   - Bank toast "gold" → "money"
+
+5. **Mobile sidebar** — hamburger menu on mobile (currently hidden)
+
+### Architecture Decisions Locked
 
 | Decision | Choice |
 |---|---|
-| Database | Supabase PostgreSQL via Prisma v7 + `@prisma/adapter-pg` |
-| Auth | NextAuth v5 — split config (`auth.config.ts` for edge proxy) |
-| Proxy | `src/proxy.ts` (Next.js 16 renamed from middleware) |
-| Real-time | Socket.io + Redis pub/sub |
-| Jobs | BullMQ on Redis |
-| Port 5432 | Blocked by ISP — use Supabase MCP for all schema changes |
-| base-ui | All base-ui components need `"use client"` directive |
-| Server Components | Never import base-ui/Radix in Server Components |
+| Combat | Instant, same HTTP response, seeded Mulberry32 RNG |
+| Turns | 50 start, +1/5min, max 100, 1 turn per attack |
+| Resources | money · land · population · energy |
+| Income | land × 10 × moraleMultiplier (per economy tick) |
+| Units | 30 types, category tabs, instant training |
+| Buildings | Multiplier-only, consume land, max 10 per type |
+| DB access | Always via Supabase MCP for schema changes (port 5432 blocked) |
+| Auth | NextAuth v5, `src/auth.config.ts` edge-safe, `src/proxy.ts` |
+
+### Critical Rules for AI Sessions
+
+1. **Server Components** must NEVER import lucide-react, @base-ui/react, framer-motion, or any module using createContext. Only `Link`, `redirect`, `auth()`, Prisma calls.
+2. **All pages** follow the pattern: `page.tsx` (Server, data only) → `PageContent.tsx` (Client, all rendering)
+3. **Combat** resolves in `POST /api/military/attack` — no BullMQ, no travel time
+4. **Turns** must be synced via `syncTurns(nationId)` before any turn-consuming action
+5. **Resource field** is `money` not `gold` everywhere in code
+6. **Unit training** is instant (no training queue timer) — just deducts money, adds to army
 
 ### Key File Locations
 
 | File | Purpose |
 |---|---|
-| `prisma/schema.prisma` | All 17 domain models |
-| `prisma.config.ts` | Prisma v7 datasource config (loads .env.local) |
-| `src/auth.config.ts` | Edge-safe NextAuth config (used by proxy) |
-| `src/proxy.ts` | Route protection (Next.js 16 proxy) |
-| `src/lib/auth.ts` | Full NextAuth config (Node.js only) |
-| `src/lib/db.ts` | Prisma client with pg adapter |
-| `src/lib/game-constants.ts` | All game balance numbers |
-| `src/server/services/` | Domain service functions |
-| `src/server/game-engine/` | Tick, combat, economy formulas |
-| `src/server/queues/index.ts` | All 11 BullMQ queues |
-| `src/server/websocket/broadcast.ts` | Redis pub/sub emitter |
-| `src/types/socket.ts` | WebSocket event type definitions |
-| `src/store/` | Zustand stores |
-| `src/components/layout/Providers.tsx` | TanStack Query + Zustand providers |
+| `prisma/schema.prisma` | All models — redesigned |
+| `prisma.config.ts` | Prisma v7 config (loads .env.local) |
+| `src/auth.config.ts` | Edge-safe NextAuth (used by proxy) |
+| `src/proxy.ts` | Route protection |
+| `src/lib/game-constants.ts` | All balance numbers |
+| `src/server/game-engine/combat.ts` | Instant battle resolution |
+| `src/server/game-engine/turns.ts` | Turn regen + spend |
+| `src/server/game-engine/resources.ts` | Economy tick formulas |
+| `src/app/api/military/attack/route.ts` | Main attack endpoint |
+| `src/app/api/buildings/route.ts` | Building construction |
+| `src/types/socket.ts` | WebSocket event types |
+| `src/store/useGameStore.ts` | Zustand live state |
+| `src/store/useUIStore.ts` | Zustand UI + alerts |
 
-### Blockers / Warnings
-- **Port 5432 blocked by ISP** — always use Supabase MCP for schema changes
-- **Redis not running locally** — BullMQ workers + WS server need Redis; dev can run without them (API routes work without Redis)
-- **Next.js 16 base-ui rule** — ANY component using `@base-ui/react` must have `"use client"` at the top
+### Blockers
+
+- **Port 5432 blocked** — all Prisma schema changes must go through Supabase MCP `apply_migration`
+- **Redis not running locally** — BullMQ workers offline; economy tick needs manual trigger or API-based polling
+- **WebSocket server offline** — real-time alerts disabled; app degrades gracefully
 
 ---
 
-## Previous Sessions
+## Previous Sessions (summary)
 
-### Session: 2026-05-12 — M1 + M2 start
-- Next.js 16 scaffold, all deps, Prisma v7, Supabase migration (47 tables)
-- Auth pages (login, register), game shell (sidebar, topbar), dashboard
-- Nation setup flow, seed data (GameWorld + 7 UnitTypes + 13 TechNodes)
-- Fixed: middleware→proxy, split NextAuth config, base-ui "use client"
+| Date | Work |
+|---|---|
+| 2026-05-09 | Architecture design, all 17 domain docs |
+| 2026-05-12 | M1: Next.js 16 scaffold, Prisma v7, Supabase migration, NextAuth, shadcn/ui |
+| 2026-05-13 | M2: Auth pages, dashboard, arsenal, nation setup, seed data |
+| 2026-05-14 | M3/M4: Research, rankings, military, bank, market, alliances, messages |
+| 2026-05-15 | REDESIGN: Turn-based, instant combat, 30 unit types, resource simplification |
