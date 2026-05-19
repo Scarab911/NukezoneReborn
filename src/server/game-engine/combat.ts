@@ -51,9 +51,44 @@ function makeSeed(attackerId: string, defenderId: string): number {
   return Math.abs(h);
 }
 
+// ── Category counter multipliers ──────────────────────────────────────────
+// attacker category → defender category → damage bonus (additive fraction)
+// e.g. AIR vs GROUND: air units deal 30% more damage to ground forces
+const COUNTER_BONUS: Partial<Record<string, Partial<Record<string, number>>>> = {
+  AIR:      { GROUND: 0.30 },  // gunships/jets punish ground formations
+  SEA:      { AIR:    0.25 },  // naval AA shreds aircraft
+  GROUND:   { SEA:    0.15 },  // coastal assault advantage
+  SPECIAL:  { GROUND: 0.20 },  // spec-ops are highly effective vs infantry
+};
+
+function categoryCounts(nation: CombatNation): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const army of nation.armies) {
+    for (const unit of army.units) {
+      if (unit.quantity > 0) {
+        counts[unit.unitType.category] = (counts[unit.unitType.category] ?? 0) + unit.quantity;
+      }
+    }
+  }
+  return counts;
+}
+
+function counterMultiplierFor(attackerCat: string, defCounts: Record<string, number>): number {
+  const bonuses = COUNTER_BONUS[attackerCat];
+  if (!bonuses) return 1;
+  const total = Object.values(defCounts).reduce((a, b) => a + b, 0);
+  if (total === 0) return 1;
+  let extra = 0;
+  for (const [defCat, bonus] of Object.entries(bonuses)) {
+    if (bonus === undefined) continue;
+    extra += bonus * ((defCounts[defCat] ?? 0) / total);
+  }
+  return 1 + extra;
+}
+
 // ── Power calculation ──────────────────────────────────────────────────────
 
-function calcAttackPower(nation: CombatNation): number {
+function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, number>): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
 
   // Building bonuses
@@ -71,15 +106,17 @@ function calcAttackPower(nation: CombatNation): number {
   for (const army of nation.armies) {
     for (const unit of army.units) {
       if (unit.quantity <= 0) continue;
-      const catBonus = buildingBonus(unit.unitType.category);
-      power += unit.quantity * unit.unitType.attack * catBonus;
+      const cat         = unit.unitType.category;
+      const catBonus    = buildingBonus(cat);
+      const counterMult = counterMultiplierFor(cat, defenderCounts);
+      power += unit.quantity * unit.unitType.attack * catBonus * counterMult;
     }
   }
 
   return Math.floor(power * moraleMult);
 }
 
-function calcDefensePower(nation: CombatNation): number {
+function calcDefensePower(nation: CombatNation, attackerCounts: Record<string, number>): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
   const towers     = nation.buildings.find((b) => b.type === "DEFENSE_TOWERS")?.count ?? 0;
   const towerBonus = 1 + towers * 0.08;
@@ -88,7 +125,9 @@ function calcDefensePower(nation: CombatNation): number {
   for (const army of nation.armies) {
     for (const unit of army.units) {
       if (unit.quantity <= 0) continue;
-      power += unit.quantity * unit.unitType.defense;
+      // Defender units that counter the attacker's composition get a defensive bonus
+      const counterMult = counterMultiplierFor(unit.unitType.category, attackerCounts);
+      power += unit.quantity * unit.unitType.defense * counterMult;
     }
   }
 
@@ -111,8 +150,10 @@ export function resolveInstant(
   const seed    = makeSeed(attacker.id, defender.id);
   const rng     = mulberry32(seed);
 
-  const atkPower  = calcAttackPower(attacker);
-  const defPower  = calcDefensePower(defender);
+  const defCounts = categoryCounts(defender);
+  const atkCounts = categoryCounts(attacker);
+  const atkPower  = calcAttackPower(attacker, defCounts);
+  const defPower  = calcDefensePower(defender, atkCounts);
   const variance  = COMBAT.VARIANCE_MIN + rng() * (COMBAT.VARIANCE_MAX - COMBAT.VARIANCE_MIN);
   const effective = atkPower * variance;
 

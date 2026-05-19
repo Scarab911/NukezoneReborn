@@ -27,6 +27,24 @@ const CAT_LABEL: Record<UnitCat, string> = {
 };
 const CATS: UnitCat[] = ["GROUND", "AIR", "SEA", "SPECIAL", "STRATEGIC"];
 
+// Counter hints per unit slug — shown in the unit card
+const COUNTER_HINT: Record<string, string> = {
+  "ranger-squad":          "Counters: Spear Team",
+  "spear-team":            "Counters: Titan MBT, Storm Artillery",
+  "ghost-operators":       "Counters: Ranger Squad",
+  "titan-apc":             "Counters: Ranger Squad, Ghost Operators",
+  "titan-mbt":             "Counters: Titan APC",
+  "storm-artillery":       "Counters: Static defenses",
+  "viper-gunship":         "Counters: Titan MBT, Titan APC",
+  "predator-drone-swarm":  "Counters: Infantry, unarmored units",
+  "strike-jet-squadron":   "Counters: Viper Gunship, Predator Drones",
+  "leviathan-destroyer":   "Counters: Strike Jets, air threats",
+  "phantom-submarine":     "Counters: Atlas Carrier, Leviathan",
+  "atlas-carrier":         "Counters: General naval presence",
+  "shadow-cell":           "Counters: Ground formations",
+  "stealth-raider-wing":   "Counters: Leviathan Destroyer",
+};
+
 export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQueue }: Props) {
   const [activeTab, setActiveTab] = useState<UnitCat>("GROUND");
 
@@ -109,9 +127,15 @@ export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQu
                   <div><p className="text-slate-500">UPKEEP</p><p className="text-yellow-400 font-bold">{unit.upkeep}/tick</p></div>
                 </div>
 
-                <div className="text-xs text-slate-500 mb-3">
+                <div className="text-xs text-slate-500 mb-1">
                   💰 {unit.moneyCost.toLocaleString()} per unit
                 </div>
+
+                {COUNTER_HINT[unit.slug] && (
+                  <div className="text-xs text-green-600 mb-3">
+                    {COUNTER_HINT[unit.slug]}
+                  </div>
+                )}
 
                 {!locked && (
                   <ArsenalTrainForm
