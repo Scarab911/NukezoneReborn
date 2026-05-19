@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { TrendingUp, Sword, Zap, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -22,7 +24,20 @@ interface Props {
 }
 
 export function DashboardContent({ nation, morale, resources }: Props) {
-  const turnPct = Math.round((nation.turns / nation.maxTurns) * 100);
+  const router   = useRouter();
+  const turnPct  = Math.round((nation.turns / nation.maxTurns) * 100);
+
+  // Run economy tick on mount + every 30s
+  useEffect(() => {
+    async function tick() {
+      const res = await fetch("/api/tick/economy", { method: "POST" });
+      const data = await res.json() as { ticks?: number; totalNet?: number };
+      if ((data.ticks ?? 0) > 0) router.refresh();
+    }
+    tick();
+    const t = setInterval(tick, 30_000);
+    return () => clearInterval(t);
+  }, [router]);
 
   return (
     <div className="space-y-6">

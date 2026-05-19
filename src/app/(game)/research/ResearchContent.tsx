@@ -126,7 +126,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
         <p className="text-slate-500 text-sm mt-0.5">Advance your nation's technology</p>
       </div>
 
-      <div className="text-xs font-mono text-yellow-400">💰 {gold.toLocaleString()} gold available</div>
+      <div className="text-xs font-mono text-yellow-400">💰 {gold.toLocaleString()} money available</div>
 
       {/* Active research banner */}
       {activeTech && activeEntry && (
@@ -219,7 +219,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
                     )}
 
                     {!canAfford && prereqOk && !done && !inProg && !activeId && (
-                      <p className="text-xs text-slate-600 mt-2">Need {node.goldCost.toLocaleString()} gold</p>
+                      <p className="text-xs text-slate-600 mt-2">Need {node.goldCost.toLocaleString()} money</p>
                     )}
 
                     {activeId && !inProg && !done && prereqOk && canAfford && (
