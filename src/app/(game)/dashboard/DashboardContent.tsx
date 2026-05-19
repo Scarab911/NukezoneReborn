@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Sword, Zap, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface Props {
   nation: {
@@ -18,14 +19,37 @@ interface Props {
     armies:   number;
     spyUnits: number;
     battles:  number;
+    explorationCount: number;
   };
   morale:    number;
   resources: { money: number; land: number; population: number; energy: number };
 }
 
+function calcExplorePreview(count: number) {
+  const turnCost   = 1 + Math.floor(count / 2);
+  const landGained = Math.max(10, Math.floor(500 * Math.pow(0.85, count)));
+  return { turnCost, landGained };
+}
+
 export function DashboardContent({ nation, morale, resources }: Props) {
   const router   = useRouter();
   const turnPct  = Math.round((nation.turns / nation.maxTurns) * 100);
+  const [exploring, setExploring] = useState(false);
+  const [exploreCount, setExploreCount] = useState(nation.explorationCount);
+
+  async function handleExplore() {
+    setExploring(true);
+    const res = await fetch("/api/game/explore", { method: "POST" });
+    const data = await res.json() as {
+      landGained?: number; turnCost?: number; explorationCount?: number;
+      error?: string;
+    };
+    setExploring(false);
+    if (!res.ok) { toast.error(data.error ?? "Exploration failed"); return; }
+    toast.success(`+${data.landGained} land explored!`);
+    setExploreCount(data.explorationCount ?? exploreCount + 1);
+    router.refresh();
+  }
 
   // Run economy tick on mount + every 30s
   useEffect(() => {
@@ -74,6 +98,14 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </CardContent>
       </Card>
 
+      {/* Explore land */}
+      <ExplorePanel
+        turns={nation.turns}
+        explorationCount={exploreCount}
+        onExplore={handleExplore}
+        busy={exploring}
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Morale" value={`${morale}%`}
@@ -114,6 +146,52 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function ExplorePanel({
+  turns, explorationCount, onExplore, busy,
+}: {
+  turns: number;
+  explorationCount: number;
+  onExplore: () => void;
+  busy: boolean;
+}) {
+  const { turnCost, landGained } = calcExplorePreview(explorationCount);
+  const { landGained: nextLand }  = calcExplorePreview(explorationCount + 1);
+  const efficiency = landGained / turnCost;        // land per turn
+  const lowValue   = efficiency < 50;
+  const canAfford  = turns >= turnCost;
+
+  return (
+    <Card className="bg-slate-900 border-slate-800">
+      <CardContent className="pt-4 pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-slate-200 font-semibold text-sm mb-0.5">🏔 Explore Land</p>
+            <p className="text-slate-500 text-xs">
+              Gain <span className="text-green-400 font-mono font-bold">+{landGained}</span> land
+              for <span className="text-purple-400 font-mono font-bold">{turnCost}</span> turn{turnCost !== 1 ? "s" : ""}
+            </p>
+            {lowValue && (
+              <p className="text-xs text-amber-600 mt-1">
+                ⚠ Diminishing returns — consider warfare for faster land gains
+              </p>
+            )}
+            <p className="text-xs text-slate-600 mt-1">
+              Next: +{nextLand} land ({1 + Math.floor((explorationCount + 1) / 2)} turn{1 + Math.floor((explorationCount + 1) / 2) !== 1 ? "s" : ""})
+            </p>
+          </div>
+          <button
+            onClick={onExplore}
+            disabled={busy || !canAfford}
+            className="shrink-0 px-4 py-2 rounded bg-green-800 hover:bg-green-700 text-white text-xs font-semibold transition-colors disabled:opacity-40"
+          >
+            {busy ? "Exploring…" : !canAfford ? `Need ${turnCost} turn${turnCost !== 1 ? "s" : ""}` : "Explore"}
+          </button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

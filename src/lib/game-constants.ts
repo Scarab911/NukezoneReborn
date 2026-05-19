@@ -106,6 +106,20 @@ export const BANK = {
   MAX_LOAN_MULTIPLIER:          3,
 } as const;
 
+// ── Exploration ───────────────────────────────────────────────────────────
+// turnCost  = EXPLORE_BASE_COST + floor(explorationCount / EXPLORE_COST_STEP)
+// landGained = max(MIN_LAND, floor(BASE_LAND * LAND_DECAY^explorationCount))
+//
+// count=0 → 1 turn, 500 land    count=5  → 3 turns, 221 land
+// count=10 → 6 turns, 97 land   count=20 → 11 turns, 18 land
+export const EXPLORE = {
+  BASE_LAND:        500,   // land gained on first exploration
+  LAND_DECAY:       0.85,  // each exploration yields 15% less
+  MIN_LAND:         10,    // floor — still gives something
+  BASE_COST:        1,     // turns for first exploration
+  COST_STEP:        2,     // cost increments every N explorations
+} as const;
+
 // ── Market ────────────────────────────────────────────────────────────────
 export const MARKET = {
   SELL_TAX:      0.05,

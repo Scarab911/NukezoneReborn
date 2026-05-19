@@ -115,6 +115,8 @@ model Nation {
   turns       Int          @default(50)
   maxTurns    Int          @default(100)
   turnsRegenAt DateTime    @default(now())
+  // Exploration — tracks how many times land was explored (for diminishing returns)
+  explorationCount Int     @default(0)
   // Military
   totalUnits  Int          @default(0)
   color       String       @default("#22c55e")
