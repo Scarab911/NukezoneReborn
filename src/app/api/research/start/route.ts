@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   if (active) return NextResponse.json({ error: "Research already in progress" }, { status: 409 });
 
   if ((nation.resource?.money ?? 0) < techNode.goldCost) {
-    return NextResponse.json({ error: "Not enough gold" }, { status: 400 });
+    return NextResponse.json({ error: "Not enough money" }, { status: 400 });
   }
 
   const completesAt = new Date(Date.now() + techNode.durationSecs * 1000);

@@ -33,7 +33,7 @@ export function BankContent({ money, balance, transactions }: Props) {
     const data = await res.json() as { error?: string };
     setBusy(false);
     if (!res.ok) { toast.error(data.error ?? "Failed"); return; }
-    toast.success(action === "deposit" ? `Deposited ${num.toLocaleString()} gold` : `Withdrew ${num.toLocaleString()} gold`);
+    toast.success(action === "deposit" ? `Deposited ${num.toLocaleString()} money` : `Withdrew ${num.toLocaleString()} money`);
     setAmount("");
     router.refresh();
   }

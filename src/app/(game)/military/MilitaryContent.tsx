@@ -1,83 +1,141 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
-interface Target { id: string; name: string; color: string; totalUnits: number; status: string; }
+interface Target {
+  id:         string;
+  name:       string;
+  color:      string;
+  totalUnits: number;
+  land:       number;
+  power:      number;
+  status:     string;
+}
 
 interface Props {
-  myNationId:  string;
-  turns:       number;
-  totalUnits:  Record<string, number>;
-  targets:     Target[];
+  myNationId:   string;
+  myPower:      number;
+  myTotalUnits: number;
+  turns:        number;
+  totalUnits:   Record<string, number>;
+  targets:      Target[];
 }
 
 interface BattleResult {
-  winner:      string;
-  summary:     string;
-  landGained:  number;
-  moneyStolen: number;
+  winner:       string;
+  summary:      string;
+  landGained:   number;
+  moneyStolen:  number;
   attackerLost: number;
   defenderLost: number;
 }
 
-export function MilitaryContent({ turns, totalUnits, targets }: Props) {
-  const router    = useRouter();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [busy,     setBusy]     = useState(false);
+type SortKey = "power" | "land" | "units" | "name";
+type FilterKey = "all" | "weaker" | "stronger";
+
+const FILTER_LABEL: Record<FilterKey, string> = {
+  all:      "All",
+  weaker:   "Weaker",
+  stronger: "Stronger",
+};
+
+function powerLabel(ratio: number): { label: string; color: string } {
+  if (ratio < 0.5) return { label: "Easy",    color: "text-green-400" };
+  if (ratio < 0.9) return { label: "Fair",     color: "text-yellow-400" };
+  if (ratio < 1.3) return { label: "Even",     color: "text-orange-400" };
+  return              { label: "Dangerous", color: "text-red-400"    };
+}
+
+export function MilitaryContent({
+  myPower, turns, totalUnits, targets,
+}: Props) {
+  const router = useRouter();
+
+  const [selected,   setSelected]   = useState<string | null>(null);
+  const [busy,       setBusy]       = useState(false);
   const [lastResult, setLastResult] = useState<BattleResult | null>(null);
+  const [search,     setSearch]     = useState("");
+  const [sort,       setSort]       = useState<SortKey>("power");
+  const [filter,     setFilter]     = useState<FilterKey>("all");
 
   const ownedTotal = Object.values(totalUnits).reduce((a, b) => a + b, 0);
   const canAttack  = turns > 0 && ownedTotal > 0;
+
+  const processed = useMemo(() => {
+    let list = targets.filter((t) => {
+      if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filter === "weaker"   && t.power >= myPower) return false;
+      if (filter === "stronger" && t.power <  myPower) return false;
+      return true;
+    });
+
+    list = [...list].sort((a, b) => {
+      if (sort === "power") return b.power - a.power;
+      if (sort === "land")  return b.land  - a.land;
+      if (sort === "units") return b.totalUnits - a.totalUnits;
+      return a.name.localeCompare(b.name);
+    });
+
+    return list;
+  }, [targets, search, sort, filter, myPower]);
+
+  const selectedTarget = targets.find((t) => t.id === selected) ?? null;
 
   async function launchAttack() {
     if (!selected || !canAttack || busy) return;
     setBusy(true);
     setLastResult(null);
 
-    const res = await fetch("/api/military/attack", {
-      method:  "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-idempotency-key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({ targetNationId: selected }),
-    });
-
-    const data = await res.json() as BattleResult & { error?: string };
-    setBusy(false);
-
-    if (!res.ok) { toast.error(data.error ?? "Attack failed"); return; }
-
-    setLastResult(data);
-    if (data.winner === "ATTACKER") {
-      toast.success(`Victory! ${data.summary}`);
-    } else {
-      toast.error(`Defeated. ${data.summary}`);
+    try {
+      const res = await fetch("/api/military/attack", {
+        method:  "POST",
+        headers: {
+          "Content-Type":     "application/json",
+          "x-idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({ targetNationId: selected }),
+      });
+      const data = await res.json() as BattleResult & { error?: string };
+      if (!res.ok) { toast.error(data.error ?? "Attack failed"); return; }
+      setLastResult(data);
+      setSelected(null);
+      if (data.winner === "ATTACKER") {
+        toast.success(`Victory! ${data.summary}`);
+      } else {
+        toast.error(`Defeated. ${data.summary}`);
+      }
+      router.refresh();
+    } catch {
+      toast.error("Attack failed — network error");
+    } finally {
+      setBusy(false);
     }
-    router.refresh();
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Military</h1>
-        <p className="text-slate-500 text-sm mt-0.5">⚡ {turns} turns available — 1 turn per attack</p>
+        <p className="text-slate-500 text-sm mt-0.5">
+          ⚡ {turns} turns — 1 per attack · Your power: <span className="text-orange-400 font-mono">{myPower.toLocaleString()}</span>
+        </p>
       </div>
 
       {/* Own forces */}
       <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-        <p className="text-slate-300 font-semibold text-sm mb-3">Your Forces</p>
+        <p className="text-slate-300 font-semibold text-sm mb-2">Your Forces</p>
         {ownedTotal === 0 ? (
-          <p className="text-slate-500 text-sm">No units. Go to Arsenal to train.</p>
+          <p className="text-slate-500 text-sm">No units — go to Arsenal to train.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {Object.entries(totalUnits).filter(([, q]) => q > 0).map(([name, qty]) => (
-              <span key={name} className="text-xs bg-slate-800 rounded px-3 py-1.5">
+              <span key={name} className="text-xs bg-slate-800 rounded px-2.5 py-1">
                 <span className="text-slate-400">{name}</span>
-                <span className="text-red-400 font-bold font-mono ml-2">{qty.toLocaleString()}</span>
+                <span className="text-red-400 font-bold font-mono ml-1.5">{qty.toLocaleString()}</span>
               </span>
             ))}
           </div>
@@ -91,7 +149,7 @@ export function MilitaryContent({ turns, totalUnits, targets }: Props) {
             ? "border-green-800 bg-green-950/20"
             : "border-red-800 bg-red-950/20"
         }`}>
-          <p className="font-semibold text-sm mb-2">
+          <p className="font-semibold text-sm mb-1">
             {lastResult.winner === "ATTACKER" ? "⚔️ Victory" : "💀 Defeat"}
           </p>
           <p className="text-slate-300 text-sm">{lastResult.summary}</p>
@@ -101,57 +159,124 @@ export function MilitaryContent({ turns, totalUnits, targets }: Props) {
               {lastResult.moneyStolen > 0 && <span className="text-yellow-400">+{lastResult.moneyStolen.toLocaleString()} 💰</span>}
             </div>
           )}
-          <p className="text-slate-500 text-xs mt-2">
+          <p className="text-slate-500 text-xs mt-1.5">
             Your losses: {lastResult.attackerLost} · Enemy losses: {lastResult.defenderLost}
           </p>
         </div>
       )}
 
-      {/* Target list */}
-      <div>
-        <p className="text-slate-400 text-sm font-medium mb-3">Select Target ({targets.length})</p>
+      {/* Target list controls */}
+      <div className="space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2">
+          {/* Search */}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name…"
+            className="flex-1 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-500"
+          />
+          {/* Sort */}
+          <div className="flex gap-1">
+            {(["power", "land", "units", "name"] as SortKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setSort(k)}
+                className={`px-2.5 py-1.5 text-xs rounded transition-colors capitalize ${
+                  sort === k
+                    ? "bg-slate-600 text-slate-100"
+                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                }`}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {targets.length === 0 && (
-          <p className="text-slate-500 text-sm py-8 text-center">No active nations to attack yet.</p>
-        )}
+        {/* Filter */}
+        <div className="flex gap-1">
+          {(["all", "weaker", "stronger"] as FilterKey[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-xs rounded transition-colors ${
+                filter === f
+                  ? "bg-red-800 text-white"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+              }`}
+            >
+              {FILTER_LABEL[f]}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-slate-500 self-center">{processed.length} nations</span>
+        </div>
+      </div>
 
-        <div className="space-y-2">
-          {targets.map((t) => (
+      {/* Target cards */}
+      {processed.length === 0 && (
+        <p className="text-slate-500 text-sm py-8 text-center">No nations match your filter.</p>
+      )}
+
+      <div className="space-y-2">
+        {processed.map((t) => {
+          const ratio = myPower > 0 ? t.power / myPower : 1;
+          const { label: diffLabel, color: diffColor } = powerLabel(ratio);
+          const potentialLand = Math.max(1, Math.floor(t.land * 0.05));
+
+          return (
             <button
               key={t.id}
               onClick={() => setSelected(t.id === selected ? null : t.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-colors ${
+              className={`w-full rounded-lg border text-left transition-colors px-4 py-3 ${
                 selected === t.id
                   ? "border-red-700 bg-red-950/30"
                   : "border-slate-800 bg-slate-900 hover:border-slate-700"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
-                <span className="text-slate-200 font-medium text-sm">{t.name}</span>
-                {t.status === "PROTECTED" && (
-                  <Badge variant="outline" className="text-[10px] border-blue-800 text-blue-400">Protected</Badge>
-                )}
+              {/* Row 1 — name + badges */}
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                  <span className="text-slate-100 font-semibold text-sm truncate">{t.name}</span>
+                  {t.status === "PROTECTED" && (
+                    <Badge variant="outline" className="text-[10px] border-blue-800 text-blue-400 shrink-0">Protected</Badge>
+                  )}
+                </div>
+                <span className={`text-xs font-semibold shrink-0 ml-2 ${diffColor}`}>{diffLabel}</span>
               </div>
-              <span className="text-red-400 font-mono text-xs">{t.totalUnits.toLocaleString()} units</span>
+
+              {/* Row 2 — stats */}
+              <div className="flex gap-4 text-xs font-mono text-slate-400">
+                <span>⚔ <span className="text-red-400">{t.totalUnits.toLocaleString()}</span> units</span>
+                <span>🌍 <span className="text-green-400">{t.land.toLocaleString()}</span> land</span>
+                <span>📊 <span className="text-orange-400">{t.power.toLocaleString()}</span> power</span>
+                <span className="text-slate-600 ml-auto">+~{potentialLand} land on win</span>
+              </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* Attack panel */}
-      {selected && (
-        <div className="sticky bottom-4 bg-slate-900 border border-red-900/50 rounded-lg p-4 flex items-center justify-between">
-          <div>
-            <p className="text-slate-200 text-sm font-semibold">
-              Target: {targets.find((t) => t.id === selected)?.name}
+      {/* Sticky attack panel */}
+      {selectedTarget && (
+        <div className="sticky bottom-4 bg-slate-900 border border-red-900/50 rounded-lg p-4 flex items-center justify-between gap-4 shadow-2xl">
+          <div className="min-w-0">
+            <p className="text-slate-200 text-sm font-semibold truncate">
+              Target: {selectedTarget.name}
             </p>
-            <p className="text-slate-500 text-xs mt-0.5">Costs 1 turn · Resolves instantly</p>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Power {selectedTarget.power.toLocaleString()} · 🌍 {selectedTarget.land.toLocaleString()} land · +~{Math.max(1, Math.floor(selectedTarget.land * 0.05))} land on win · Costs 1 turn
+            </p>
+            {!canAttack && (
+              <p className="text-red-400 text-xs mt-0.5">
+                {turns === 0 ? "No turns left" : "No units — train first"}
+              </p>
+            )}
           </div>
           <button
             onClick={launchAttack}
             disabled={busy || !canAttack}
-            className="px-6 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-sm rounded-lg disabled:opacity-40 transition-colors"
+            className="shrink-0 px-6 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-sm rounded-lg disabled:opacity-40 transition-colors"
           >
             {busy ? "Attacking…" : "⚔️ Attack"}
           </button>

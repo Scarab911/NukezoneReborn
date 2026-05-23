@@ -123,7 +123,7 @@ export function MarketContent({ resources, openOrders, myOrders }: Props) {
             </div>
 
             <p className="text-xs text-slate-500">
-              Total: {(parseInt(qty) * parseInt(price) || 0).toLocaleString()} gold
+              Total: {(parseInt(qty) * parseInt(price) || 0).toLocaleString()} money
               {side === "SELL" && " (−5% tax on proceeds)"}
             </p>
 
