@@ -29,7 +29,7 @@ export default async function MilitaryPage() {
       id:         true,
       name:       true,
       color:      true,
-      totalUnits: true,
+      totalUnits: true,   // used server-side for power calc only
       status:     true,
       resource:   { select: { land: true } },
     },
@@ -54,13 +54,12 @@ export default async function MilitaryPage() {
       turns={fresh.turns}
       totalUnits={totalUnits}
       targets={targets.map((t) => ({
-        id:         t.id,
-        name:       t.name,
-        color:      t.color,
-        totalUnits: t.totalUnits,
-        land:       t.resource?.land ?? 0,
-        power:      t.totalUnits * 10 + (t.resource?.land ?? 0) * 5,
-        status:     t.status,
+        id:     t.id,
+        name:   t.name,
+        color:  t.color,
+        land:   t.resource?.land ?? 0,
+        power:  t.totalUnits * 10 + (t.resource?.land ?? 0) * 5,
+        status: t.status,
       }))}
     />
   );

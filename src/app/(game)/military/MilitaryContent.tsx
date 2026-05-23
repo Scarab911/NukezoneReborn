@@ -6,13 +6,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 interface Target {
-  id:         string;
-  name:       string;
-  color:      string;
-  totalUnits: number;
-  land:       number;
-  power:      number;
-  status:     string;
+  id:     string;
+  name:   string;
+  color:  string;
+  land:   number;
+  power:  number;
+  status: string;
 }
 
 interface Props {
@@ -33,7 +32,7 @@ interface BattleResult {
   defenderLost: number;
 }
 
-type SortKey = "power" | "land" | "units" | "name";
+type SortKey = "power" | "land" | "name";
 type FilterKey = "all" | "weaker" | "stronger";
 
 const FILTER_LABEL: Record<FilterKey, string> = {
@@ -75,7 +74,6 @@ export function MilitaryContent({
     list = [...list].sort((a, b) => {
       if (sort === "power") return b.power - a.power;
       if (sort === "land")  return b.land  - a.land;
-      if (sort === "units") return b.totalUnits - a.totalUnits;
       return a.name.localeCompare(b.name);
     });
 
@@ -177,7 +175,7 @@ export function MilitaryContent({
           />
           {/* Sort */}
           <div className="flex gap-1">
-            {(["power", "land", "units", "name"] as SortKey[]).map((k) => (
+            {(["power", "land", "name"] as SortKey[]).map((k) => (
               <button
                 key={k}
                 onClick={() => setSort(k)}
@@ -247,7 +245,6 @@ export function MilitaryContent({
 
               {/* Row 2 — stats */}
               <div className="flex gap-4 text-xs font-mono text-slate-400">
-                <span>⚔ <span className="text-red-400">{t.totalUnits.toLocaleString()}</span> units</span>
                 <span>🌍 <span className="text-green-400">{t.land.toLocaleString()}</span> land</span>
                 <span>📊 <span className="text-orange-400">{t.power.toLocaleString()}</span> power</span>
                 <span className="text-slate-600 ml-auto">+~{potentialLand} land on win</span>
