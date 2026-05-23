@@ -35,7 +35,7 @@ export const ECONOMY = {
   LAND_MAX:            10_000,
 
   // Protection period for new nations (hours)
-  PROTECTION_HOURS: 48,
+  PROTECTION_HOURS: 72,
 } as const;
 
 // ── Morale ────────────────────────────────────────────────────────────────

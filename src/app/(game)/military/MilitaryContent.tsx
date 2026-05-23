@@ -15,21 +15,24 @@ interface Target {
 }
 
 interface Props {
-  myNationId:   string;
-  myPower:      number;
-  myTotalUnits: number;
-  turns:        number;
-  totalUnits:   Record<string, number>;
-  targets:      Target[];
+  myNationId:          string;
+  myPower:             number;
+  myTotalUnits:        number;
+  myStatus:            string;
+  protectionExpiresAt: string | null;
+  turns:               number;
+  totalUnits:          Record<string, number>;
+  targets:             Target[];
 }
 
 interface BattleResult {
-  winner:       string;
-  summary:      string;
-  landGained:   number;
-  moneyStolen:  number;
-  attackerLost: number;
-  defenderLost: number;
+  winner:                string;
+  summary:               string;
+  landGained:            number;
+  moneyStolen:           number;
+  attackerLost:          number;
+  defenderLost:          number;
+  attackerLostProtection?: boolean;
 }
 
 type SortKey = "power" | "land" | "name";
@@ -49,16 +52,19 @@ function powerLabel(ratio: number): { label: string; color: string } {
 }
 
 export function MilitaryContent({
-  myPower, turns, totalUnits, targets,
+  myPower, myStatus, protectionExpiresAt, turns, totalUnits, targets,
 }: Props) {
   const router = useRouter();
 
-  const [selected,   setSelected]   = useState<string | null>(null);
-  const [busy,       setBusy]       = useState(false);
-  const [lastResult, setLastResult] = useState<BattleResult | null>(null);
-  const [search,     setSearch]     = useState("");
-  const [sort,       setSort]       = useState<SortKey>("power");
-  const [filter,     setFilter]     = useState<FilterKey>("all");
+  const [selected,    setSelected]    = useState<string | null>(null);
+  const [confirming,  setConfirming]  = useState(false);
+  const [busy,        setBusy]        = useState(false);
+  const [lastResult,  setLastResult]  = useState<BattleResult | null>(null);
+  const [search,      setSearch]      = useState("");
+  const [sort,        setSort]        = useState<SortKey>("power");
+  const [filter,      setFilter]      = useState<FilterKey>("all");
+
+  const isProtected = myStatus === "PROTECTED";
 
   const ownedTotal = Object.values(totalUnits).reduce((a, b) => a + b, 0);
   const canAttack  = turns > 0 && ownedTotal > 0;
@@ -82,22 +88,41 @@ export function MilitaryContent({
 
   const selectedTarget = targets.find((t) => t.id === selected) ?? null;
 
-  async function launchAttack() {
+  function requestAttack() {
+    if (!selected || !canAttack) return;
+    setConfirming(true);
+  }
+
+  function cancelAttack() {
+    setConfirming(false);
+  }
+
+  async function confirmAttack() {
     if (!selected || !canAttack || busy) return;
     setBusy(true);
+    setConfirming(false);
     setLastResult(null);
 
     try {
       const res = await fetch("/api/military/attack", {
         method:  "POST",
         headers: {
-          "Content-Type":     "application/json",
+          "Content-Type":      "application/json",
           "x-idempotency-key": crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetNationId: selected }),
+        body: JSON.stringify({
+          targetNationId:            selected,
+          acknowledgeProtectionLoss: isProtected,
+        }),
       });
-      const data = await res.json() as BattleResult & { error?: string };
-      if (!res.ok) { toast.error(data.error ?? "Attack failed"); return; }
+      const data = await res.json() as BattleResult & { error?: string; requiresConfirm?: boolean };
+      if (!res.ok) {
+        toast.error(data.error === "PROTECTION_ACTIVE" ? "You are still under protection." : (data.error ?? "Attack failed"));
+        return;
+      }
+      if (data.attackerLostProtection) {
+        toast.warning("Your protection has been lifted. You are now vulnerable.");
+      }
       setLastResult(data);
       setSelected(null);
       if (data.winner === "ATTACKER") {
@@ -121,6 +146,13 @@ export function MilitaryContent({
         <p className="text-slate-500 text-sm mt-0.5">
           ⚡ {turns} turns — 1 per attack · Your power: <span className="text-orange-400 font-mono">{myPower.toLocaleString()}</span>
         </p>
+        {isProtected && protectionExpiresAt && (
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-950/40 border border-blue-800/50 text-xs text-blue-300">
+            🛡️ Under protection until{" "}
+            <span className="font-semibold">{new Date(protectionExpiresAt).toLocaleString()}</span>
+            <span className="text-blue-500">— attacking will remove it</span>
+          </div>
+        )}
       </div>
 
       {/* Own forces */}
@@ -224,7 +256,7 @@ export function MilitaryContent({
           return (
             <button
               key={t.id}
-              onClick={() => setSelected(t.id === selected ? null : t.id)}
+              onClick={() => { setSelected(t.id === selected ? null : t.id); setConfirming(false); }}
               className={`w-full rounded-lg border text-left transition-colors px-4 py-3 ${
                 selected === t.id
                   ? "border-red-700 bg-red-950/30"
@@ -256,27 +288,73 @@ export function MilitaryContent({
 
       {/* Sticky attack panel */}
       {selectedTarget && (
-        <div className="sticky bottom-4 bg-slate-900 border border-red-900/50 rounded-lg p-4 flex items-center justify-between gap-4 shadow-2xl">
-          <div className="min-w-0">
-            <p className="text-slate-200 text-sm font-semibold truncate">
-              Target: {selectedTarget.name}
-            </p>
-            <p className="text-slate-500 text-xs mt-0.5">
-              Power {selectedTarget.power.toLocaleString()} · 🌍 {selectedTarget.land.toLocaleString()} land · +~{Math.max(1, Math.floor(selectedTarget.land * 0.05))} land on win · Costs 1 turn
-            </p>
-            {!canAttack && (
-              <p className="text-red-400 text-xs mt-0.5">
-                {turns === 0 ? "No turns left" : "No units — train first"}
+        <div className={`sticky bottom-4 rounded-lg border p-4 shadow-2xl transition-colors ${
+          confirming
+            ? "bg-slate-900 border-amber-700/60"
+            : "bg-slate-900 border-red-900/50"
+        }`}>
+          {!confirming ? (
+            /* Normal state */
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-slate-200 text-sm font-semibold truncate">
+                  Target: {selectedTarget.name}
+                </p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Power {selectedTarget.power.toLocaleString()} · 🌍 {selectedTarget.land.toLocaleString()} land ·{" "}
+                  +~{Math.max(1, Math.floor(selectedTarget.land * 0.05))} land on win · Costs 1 turn
+                </p>
+                {!canAttack && (
+                  <p className="text-red-400 text-xs mt-0.5">
+                    {turns === 0 ? "No turns left" : "No units — train first"}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={requestAttack}
+                disabled={busy || !canAttack}
+                className="shrink-0 px-6 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-sm rounded-lg disabled:opacity-40 transition-colors"
+              >
+                ⚔️ Attack
+              </button>
+            </div>
+          ) : (
+            /* Confirmation state */
+            <div className="space-y-3">
+              {isProtected ? (
+                <p className="text-amber-300 text-sm font-semibold">
+                  ⚠️ You are under protection. Attacking will permanently remove your shield.
+                </p>
+              ) : (
+                <p className="text-slate-200 text-sm font-semibold">
+                  Confirm attack on <span className="text-red-400">{selectedTarget.name}</span>?
+                </p>
+              )}
+              <p className="text-slate-400 text-xs">
+                {isProtected
+                  ? `Protection expires ${new Date(protectionExpiresAt!).toLocaleString()}. Once removed it cannot be restored.`
+                  : `Costs 1 turn · Resolves instantly · Potential gain: +~${Math.max(1, Math.floor(selectedTarget.land * 0.05))} land`}
               </p>
-            )}
-          </div>
-          <button
-            onClick={launchAttack}
-            disabled={busy || !canAttack}
-            className="shrink-0 px-6 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-sm rounded-lg disabled:opacity-40 transition-colors"
-          >
-            {busy ? "Attacking…" : "⚔️ Attack"}
-          </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={confirmAttack}
+                  disabled={busy}
+                  className={`flex-1 py-2 font-bold text-sm rounded-lg text-white disabled:opacity-40 transition-colors ${
+                    isProtected ? "bg-amber-700 hover:bg-amber-600" : "bg-red-700 hover:bg-red-600"
+                  }`}
+                >
+                  {busy ? "Attacking…" : isProtected ? "⚔️ Attack & lose protection" : "⚔️ Confirm attack"}
+                </button>
+                <button
+                  onClick={cancelAttack}
+                  disabled={busy}
+                  className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-sm rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns } from "@/server/game-engine/turns";
+import { ECONOMY } from "@/lib/game-constants";
 import { MilitaryContent } from "./MilitaryContent";
 
 export default async function MilitaryPage() {
@@ -38,6 +39,9 @@ export default async function MilitaryPage() {
   });
 
   const myPower = me.totalUnits * 10 + (me.resource?.land ?? 0) * 5;
+  const protectionExpiresAt = me.status === "PROTECTED"
+    ? new Date(me.createdAt.getTime() + ECONOMY.PROTECTION_HOURS * 3_600_000).toISOString()
+    : null;
 
   const totalUnits: Record<string, number> = {};
   for (const army of me.armies) {
@@ -51,6 +55,8 @@ export default async function MilitaryPage() {
       myNationId={me.id}
       myPower={myPower}
       myTotalUnits={me.totalUnits}
+      myStatus={me.status}
+      protectionExpiresAt={protectionExpiresAt}
       turns={fresh.turns}
       totalUnits={totalUnits}
       targets={targets.map((t) => ({
