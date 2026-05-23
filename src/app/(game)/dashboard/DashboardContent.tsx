@@ -56,12 +56,16 @@ export function DashboardContent({ nation, morale, resources }: Props) {
     }
   }
 
-  // Run economy tick on mount + every 30s
+  // Run economy tick on mount + every 30s — failures are silent (non-critical)
   useEffect(() => {
     async function tick() {
-      const res = await fetch("/api/tick/economy", { method: "POST" });
-      const data = await res.json() as { ticks?: number; totalNet?: number };
-      if ((data.ticks ?? 0) > 0) router.refresh();
+      try {
+        const res  = await fetch("/api/tick/economy", { method: "POST" });
+        const data = await res.json() as { ticks?: number };
+        if ((data.ticks ?? 0) > 0) router.refresh();
+      } catch {
+        // tick failure is non-critical — next interval will retry
+      }
     }
     tick();
     const t = setInterval(tick, 30_000);
