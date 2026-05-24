@@ -7,7 +7,7 @@ import type { Nation, Resource, MoraleRecord, Unit, UnitType, Building } from "@
 export interface CombatNation {
   id:       string;
   name:     string;
-  resource: Pick<Resource, "money" | "land" | "population" | "energy"> | null;
+  resource: Pick<Resource, "money" | "land" | "energy"> | null;
   morale:   Pick<MoraleRecord, "morale"> | null;
   armies:   Array<{
     units: Array<{ quantity: number; unitType: UnitType }>;

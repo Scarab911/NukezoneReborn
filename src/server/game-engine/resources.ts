@@ -2,7 +2,7 @@ import { ECONOMY, MORALE } from "@/lib/game-constants";
 import type { Resource, MoraleRecord } from "@prisma/client";
 
 export interface NationEconomyState {
-  resource: Pick<Resource, "money" | "land" | "population" | "energy">;
+  resource: Pick<Resource, "money" | "land" | "energy">;
   morale:   Pick<MoraleRecord, "morale">;
   totalUnits: number;
   buildingCount: number;
@@ -15,11 +15,10 @@ export interface ResourceDelta {
 
 export function calculateIncome(state: NationEconomyState): ResourceDelta {
   const moraleMultiplier = 0.5 + (state.morale.morale / 100) * 0.8;
-  const landIncome       = state.resource.land * ECONOMY.BASE_INCOME_PER_LAND;
-  const popIncome        = state.resource.population * ECONOMY.POP_INCOME_MULTIPLIER;
+  const landIncome = state.resource.land * ECONOMY.BASE_INCOME_PER_LAND;
 
   return {
-    money:  Math.floor((landIncome + popIncome) * moraleMultiplier),
+    money:  Math.floor(landIncome * moraleMultiplier),
     energy: 0,
   };
 }

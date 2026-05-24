@@ -7,13 +7,12 @@ export async function getResources(nationId: string): Promise<Resource | null> {
 
 export async function applyResourceDelta(
   nationId: string,
-  delta: Partial<Pick<Resource, "money" | "land" | "population" | "energy">>,
+  delta: Partial<Pick<Resource, "money" | "land" | "energy">>,
 ): Promise<Resource> {
   const data: Record<string, unknown> = {};
-  if (delta.money      !== undefined) data.money      = { increment: delta.money };
-  if (delta.land       !== undefined) data.land       = { increment: delta.land };
-  if (delta.population !== undefined) data.population = { increment: delta.population };
-  if (delta.energy     !== undefined) data.energy     = { increment: delta.energy };
+  if (delta.money  !== undefined) data.money  = { increment: delta.money };
+  if (delta.land   !== undefined) data.land   = { increment: delta.land };
+  if (delta.energy !== undefined) data.energy = { increment: delta.energy };
   return prisma.resource.update({ where: { nationId }, data });
 }
 

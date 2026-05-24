@@ -16,7 +16,6 @@ export const TURNS = {
 export const ECONOMY = {
   // Income: money per tick
   BASE_INCOME_PER_LAND: 10,      // flat land income
-  POP_INCOME_MULTIPLIER: 0.005,  // population contribution per pop unit
 
   // Upkeep (per economy tick)
   UPKEEP_PER_UNIT: 0.1,          // gold per unit per tick
@@ -25,7 +24,6 @@ export const ECONOMY = {
   // Starting resources
   STARTING_MONEY:      5_000,
   STARTING_LAND:       100,
-  STARTING_POPULATION: 1_000,
   STARTING_ENERGY:     200,
   STARTING_MORALE:     75,
   STARTING_TURNS:      50,

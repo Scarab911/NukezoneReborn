@@ -61,10 +61,9 @@ export async function POST(req: NextRequest) {
     await tx.resource.create({
       data: {
         nationId:   n.id,
-        money:      ECONOMY.STARTING_MONEY,
-        land:       ECONOMY.STARTING_LAND,
-        population: ECONOMY.STARTING_POPULATION,
-        energy:     ECONOMY.STARTING_ENERGY,
+        money:  ECONOMY.STARTING_MONEY,
+        land:   ECONOMY.STARTING_LAND,
+        energy: ECONOMY.STARTING_ENERGY,
       },
     });
 

@@ -9,12 +9,11 @@ interface TopBarProps {
   nationName?: string;
   money?:      number;
   land?:       number;
-  population?: number;
   turns?:      number;
   maxTurns?:   number;
 }
 
-export function TopBar({ nationName, money, land, population, turns, maxTurns }: TopBarProps) {
+export function TopBar({ nationName, money, land, turns, maxTurns }: TopBarProps) {
   return (
     <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-4 gap-4 shrink-0">
       {nationName && (
@@ -25,10 +24,9 @@ export function TopBar({ nationName, money, land, population, turns, maxTurns }:
 
       {/* Resource HUD */}
       <div className="flex items-center gap-3 ml-auto text-xs font-mono flex-wrap">
-        {money      !== undefined && <span className="text-yellow-400"     title="Money">💰 {money.toLocaleString()}</span>}
-        {land       !== undefined && <span className="text-green-400"      title="Land">🌍 {land.toLocaleString()}</span>}
-        {population !== undefined && <span className="text-blue-300"       title="Population">👥 {population.toLocaleString()}</span>}
-        {turns      !== undefined && (
+        {money !== undefined && <span className="text-yellow-400" title="Money">💰 {money.toLocaleString()}</span>}
+        {land  !== undefined && <span className="text-green-400"  title="Land">🌍 {land.toLocaleString()}</span>}
+        {turns !== undefined && (
           <span
             className={turns > 0 ? "text-purple-400" : "text-slate-600"}
             title={`Turns (${turns}/${maxTurns ?? 100})`}

@@ -162,9 +162,8 @@ model Nation {
 model Resource {
   id         String   @id @default(cuid())
   nationId   String   @unique
-  money      Int      @default(5000)   // primary currency (was "gold")
+  money      Int      @default(5000)   // primary currency
   land       Int      @default(100)    // territory scale, income base
-  population Int      @default(1000)   // income multiplier
   energy     Int      @default(200)    // building support
   updatedAt  DateTime @updatedAt
   nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)

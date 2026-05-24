@@ -33,7 +33,6 @@ export default async function GameLayout({ children }: { children: React.ReactNo
           nationName={nation.name}
           money={nation.resource?.money}
           land={nation.resource?.land}
-          population={nation.resource?.population}
           turns={fresh.turns}
           maxTurns={fresh.maxTurns}
         />

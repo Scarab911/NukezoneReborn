@@ -28,12 +28,9 @@ export async function POST() {
     if (ticks === 0) return NextResponse.json({ ticks: 0, income: 0, upkeep: 0 });
 
     const moraleMultiplier = 0.5 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
-    const land             = nation.resource.land;
-    const population       = nation.resource.population;
+    const land = nation.resource.land;
 
-    const incomePerTick = Math.floor(
-      (land * ECONOMY.BASE_INCOME_PER_LAND + population * ECONOMY.POP_INCOME_MULTIPLIER) * moraleMultiplier,
-    );
+    const incomePerTick = Math.floor(land * ECONOMY.BASE_INCOME_PER_LAND * moraleMultiplier);
     const upkeepPerTick = Math.floor(nation.totalUnits * ECONOMY.UPKEEP_PER_UNIT);
     const netPerTick    = incomePerTick - upkeepPerTick;
     const totalNet      = netPerTick * ticks;
