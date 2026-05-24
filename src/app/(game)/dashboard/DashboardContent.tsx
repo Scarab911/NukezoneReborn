@@ -22,7 +22,7 @@ interface Props {
     explorationCount: number;
   };
   morale:    number;
-  resources: { money: number; land: number; population: number; energy: number };
+  resources: { money: number; land: number; power: number; energy: number };
 }
 
 function calcExplorePreview(count: number) {
@@ -135,10 +135,10 @@ export function DashboardContent({ nation, morale, resources }: Props) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <ResourceRow emoji="💰" label="Money"      value={resources.money}      color="text-yellow-400" />
-            <ResourceRow emoji="🌍" label="Land"       value={resources.land}       color="text-green-400"  />
-            <ResourceRow emoji="👥" label="Population" value={resources.population} color="text-blue-300"   />
-            <ResourceRow emoji="⚡" label="Energy"     value={resources.energy}     color="text-blue-400"   />
+            <ResourceRow emoji="💰" label="Money"  value={resources.money}  color="text-yellow-400" />
+            <ResourceRow emoji="🌍" label="Land"   value={resources.land}   color="text-green-400"  />
+            <ResourceRow emoji="📊" label="Power"  value={resources.power}  color="text-orange-400" />
+            <ResourceRow emoji="⚡" label="Energy" value={resources.energy} color="text-blue-400"   />
           </div>
         </CardContent>
       </Card>

@@ -40,10 +40,10 @@ export default async function DashboardPage() {
       }}
       morale={nation.morale?.morale ?? 75}
       resources={{
-        money:      nation.resource?.money      ?? 0,
-        land:       nation.resource?.land       ?? 0,
-        population: nation.resource?.population ?? 0,
-        energy:     nation.resource?.energy     ?? 0,
+        money:  nation.resource?.money  ?? 0,
+        land:   nation.resource?.land   ?? 0,
+        power:  nation.totalUnits * 10 + (nation.resource?.land ?? 0) * 5,
+        energy: nation.resource?.energy ?? 0,
       }}
     />
   );
