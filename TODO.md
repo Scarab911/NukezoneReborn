@@ -1,6 +1,6 @@
 # TODO.md — NukezoneReborn
 
-Last updated: 2026-05-23
+Last updated: 2026-10-30
 
 ---
 
@@ -12,7 +12,7 @@ Last updated: 2026-05-23
 | Map | None — abstract nation list | No territory map, no coordinates |
 | Combat | Server-side instant resolution | No BullMQ delay needed for combat |
 | Counter system | Category-level multipliers (proportional) | AIR vs GROUND, SEA vs AIR, etc. |
-| Resources | Money · Land · Population · Energy only | Removed food/steel |
+| Resources | Money · Land · Energy only | Removed food/steel/population |
 | Turns | 50 start, +1/5min, max 100 | Limits session length |
 | Exploration | Diminishing returns (500→10 land, 1→N turns) | Passive land growth mechanic |
 | Units | 18 named types across 5 categories | Redesigned from 30 generic types |
@@ -24,8 +24,7 @@ Last updated: 2026-05-23
 
 - [x] **M1 — Project Foundation**
 - [x] **M2 — Core Game Loop**
-- [x] **M3 — Polish & Completeness** (≈done, 3 label fixes outstanding)
-- [ ] **M4 — Social & Economy** (espionage UI, alliances full, messages, market improvements)
+- [x] **M3 — Polish & Completeness** - [ ] **M4 — Social & Economy** (espionage UI, alliances full, messages, market improvements)
 - [ ] **M5 — Animations & PWA**
 - [ ] **M6 — Admin & Deployment**
 
@@ -72,10 +71,11 @@ Last updated: 2026-05-23
 
 ## 🔜 REMAINING
 
-### Quick Wins — Label/Wording Cleanup
-- [ ] `BankContent.tsx:36` — toast says "Deposited X gold" → "money"
-- [ ] `MarketContent.tsx:126` — "Total: X gold" → "money"
-- [ ] `research/start/route.ts:48` — "Not enough gold" → "Not enough money"
+### Security
+- [ ] Enable RLS on all 45 public tables (currently exposed to Supabase anon key; Prisma bypasses RLS)
+
+### Maintenance
+- [ ] Minor dependency upgrades (Prisma 7.10, base-ui, TanStack Query) + `npm audit fix`
 
 ### Battle History Page
 - [ ] `/battles` — list own past attacking + defending battles

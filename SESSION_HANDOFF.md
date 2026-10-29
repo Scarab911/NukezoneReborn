@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-10-30 — Migration to New PC + Audit
+
+### What Was Done
+- Project transferred to a new PC; repo verified in sync with `origin/master`
+- `npm ci` on Node 24 / npm 12 — npm 12 blocks install scripts by default, so `allowScripts` was added to `package.json` (prisma, @prisma/engines, esbuild, sharp, unrs-resolver)
+- `prisma generate` run; DB schema verified to match `schema.prisma` (no drift)
+- Supabase project had been auto-paused (free tier inactivity) — restored; data intact
+- `.env.local` recreated (gitignored — not transferred). Auth secrets regenerated; `DATABASE_URL` password and Discord OAuth creds must be filled in manually
+- Lint fixed: 0 errors, 0 warnings (`useState(() => Date.now())`, unescaped `'`, unused imports)
+
+### Open Issues Found
+- **RLS disabled on all 45 public tables** — exposed to Supabase anon key. App uses Prisma (bypasses RLS), so enabling RLS with no policies is safe for the app but not yet applied
+- Dependencies have minor updates available (Prisma 7.8 → 7.10, etc.) and `npm audit` reports vulnerabilities — not upgraded yet
+
+---
+
+## Work Since 2026-05-23 (commits after last handoff)
+- **Military target intel**: land, power score, difficulty label; sort/filter/search; sticky attack panel with potential land gain (`c6527f2`)
+- **Label cleanup done**: gold → money in bank, market, research (`c6527f2`)
+- **Enemy unit count hidden** — spies-only intel; `totalUnits` used server-side only (`e056206`)
+- **Economy tick fix**: morale row upsert, try-catch, silent client errors (`9f0657e`)
+- **72h new-player protection**: lazily expires; attacking while protected requires `acknowledgeProtectionLoss=true` and strips protection; two-step confirm UI (`5963782`)
+- **Dashboard** shows power score instead of population (`4c8c110`)
+- **Population removed entirely** — schema, constants, tick, combat, HUD; income is land-based (`bdab2d6`)
+
+---
+
 ## Session: 2026-05-23 — M3 Polish + Unit Redesign + Exploration
 
 ### What Was Done
@@ -39,14 +66,11 @@
 ```
 
 ### Current Focus
-**M4 — Social & Economy Full** (M3 complete except minor label cleanup)
+**M4 — Social & Economy Full** (M3 complete)
 
 ### Immediate Next Actions (priority order)
 
-1. **Label cleanup** (quick — 3 files):
-   - `BankContent.tsx:36` — toast says "gold" → "money"
-   - `MarketContent.tsx:126` — "Total: X gold" → "money"
-   - `research/start/route.ts:48` — "Not enough gold" → "Not enough money"
+1. **Security**: decide on enabling RLS for all public tables (see Open Issues above)
 
 2. **Battle history page** (`/battles`):
    - List own attacking + defending battles with results
@@ -71,7 +95,8 @@
 | Combat | Instant, same HTTP response, seeded Mulberry32 RNG |
 | Counter system | Category-level multipliers (proportional to enemy composition) |
 | Turns | 50 start, +1/5min, max 100, 1 turn per attack |
-| Resources | money · land · population · energy |
+| Resources | money · land · energy (population removed 2026-05-24) |
+| Protection | 72h for new nations; lost on attacking |
 | Exploration | Diminishing returns: BASE_LAND=500, LAND_DECAY=0.85, MIN=10 |
 | Units | 18 named types across 5 categories |
 | Buildings | Multiplier-only, consume land, max 10 per type |
