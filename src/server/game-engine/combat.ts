@@ -1,6 +1,6 @@
 import { COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
-import type { Nation, Resource, MoraleRecord, Unit, UnitType, Building } from "@prisma/client";
+import type { Resource, MoraleRecord, UnitType, Building } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 

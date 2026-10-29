@@ -53,7 +53,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export function ResearchContent({ gold, techNodes, progressMap }: Props) {
   const router  = useRouter();
   const [busy,  setBusy]  = useState<string | null>(null);
-  const [now,   setNow]   = useState(Date.now());
+  const [now,   setNow]   = useState(() => Date.now());
 
   // Tick every second to update progress bars / countdown
   useEffect(() => {
@@ -123,7 +123,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Research</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Advance your nation's technology</p>
+        <p className="text-slate-500 text-sm mt-0.5">Advance your nation&apos;s technology</p>
       </div>
 
       <div className="text-xs font-mono text-yellow-400">💰 {gold.toLocaleString()} money available</div>
