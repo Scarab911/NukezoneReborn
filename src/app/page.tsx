@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { countOnlinePlayers } from "@/server/services/presence.service";
 
 export default async function LandingPage() {
   const session = await auth();
   if (session?.user) redirect("/dashboard");
+
+  const onlineCount = await countOnlinePlayers().catch(() => 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -35,9 +38,12 @@ export default async function LandingPage() {
       {/* Hero */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-red-950/50 border border-red-900/50 rounded-full px-4 py-1.5 text-sm text-red-400 mb-8">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-            World 1 — Now Active
+          <div className="inline-flex items-center gap-2 bg-emerald-950/40 border border-emerald-900/50 rounded-full px-4 py-1.5 text-sm text-emerald-400 mb-8">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+            <span>
+              <span className="font-bold tabular-nums">{onlineCount.toLocaleString()}</span>{" "}
+              {onlineCount === 1 ? "commander" : "commanders"} online
+            </span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-black tracking-tight text-slate-50 mb-6 leading-tight">

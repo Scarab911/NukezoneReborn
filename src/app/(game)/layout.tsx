@@ -5,6 +5,8 @@ import { GameSidebar } from "@/components/layout/GameSidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { AlertBar } from "@/components/game/AlertBar";
 import { syncTurns } from "@/server/game-engine/turns";
+import { touchPlayerActivity } from "@/server/services/presence.service";
+import { PresenceHeartbeat } from "@/components/layout/PresenceHeartbeat";
 
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -17,8 +19,8 @@ export default async function GameLayout({ children }: { children: React.ReactNo
 
   if (!nation) redirect("/setup");
 
-  // Keep turns in sync on every game page load
-  await syncTurns(nation.id);
+  // Keep turns in sync and mark the player online on every game page load
+  await Promise.all([syncTurns(nation.id), touchPlayerActivity(session.user.id)]);
   const fresh = await prisma.nation.findUniqueOrThrow({
     where:  { id: nation.id },
     select: { turns: true, maxTurns: true, turnsRegenAt: true },
@@ -26,6 +28,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      <PresenceHeartbeat />
       <GameSidebar />
 
       <div className="flex-1 flex flex-col min-w-0">
