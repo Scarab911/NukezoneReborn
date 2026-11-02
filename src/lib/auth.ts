@@ -17,10 +17,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
   providers: [
-    Discord({
-      clientId:     process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-    }),
+    // Discord is disabled until OAuth credentials are configured — email/password only for now
+    ...(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET
+      ? [Discord({
+          clientId:     process.env.DISCORD_CLIENT_ID,
+          clientSecret: process.env.DISCORD_CLIENT_SECRET,
+        })]
+      : []),
 
     Credentials({
       credentials: {

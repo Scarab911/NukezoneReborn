@@ -90,15 +90,6 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Sign In"}
           </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"
-            onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-          >
-            Continue with Discord
-          </Button>
-
           <p className="text-sm text-slate-500 text-center">
             No account?{" "}
             <Link href="/register" className="text-red-400 hover:text-red-300">
