@@ -111,8 +111,13 @@ model GameWorld {
 model Nation {
   id          String       @id @default(cuid())
   worldId     String
-  playerId    String       @unique
+  // Current owner. Set to null when the enclave is destroyed and the player
+  // founds a new one; formerPlayerId keeps the link for history.
+  playerId       String?   @unique
+  formerPlayerId String?
   name        String
+  // Renames left. Reset per round / topped up for VIPs in the future.
+  nameChangesLeft Int      @default(1)
   status      NationStatus @default(ACTIVE)
   // Turn system — regenerates 1/5min, max 100
   turns       Int          @default(50)
@@ -127,7 +132,7 @@ model Nation {
   updatedAt   DateTime     @updatedAt
 
   world   GameWorld @relation(fields: [worldId], references: [id])
-  player  Player    @relation(fields: [playerId], references: [id])
+  player  Player?   @relation(fields: [playerId], references: [id], onDelete: Restrict)
 
   resource      Resource?
   morale        MoraleRecord?
@@ -156,6 +161,7 @@ model Nation {
 
   @@index([worldId, status])
   @@index([playerId])
+  @@index([formerPlayerId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

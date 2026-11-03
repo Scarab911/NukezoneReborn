@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { ENCLAVE } from "@/lib/game-constants";
+import { renameEnclave, type RenameEnclaveResult } from "@/server/services/nation.service";
 
 const Schema = z.object({
-  nationName: z.string().min(2).max(32).trim().optional(),
-  color:      z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  nationName: z.string().trim().min(ENCLAVE.NAME_MIN).max(ENCLAVE.NAME_MAX),
 });
+
+type RenameError = Extract<RenameEnclaveResult, { ok: false }>["error"];
+
+const ERRORS: Record<RenameError, { message: string; status: number }> = {
+  NO_ENCLAVE:      { message: "No enclave",                    status: 404 },
+  SAME_NAME:       { message: "That is already your name",     status: 400 },
+  NO_RENAMES_LEFT: { message: "No name changes left",          status: 403 },
+  NAME_TAKEN:      { message: "Name already taken",            status: 409 },
+};
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
@@ -16,21 +25,11 @@ export async function PATCH(req: NextRequest) {
   const parsed = Schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { nationName, color } = parsed.data;
-  if (!nationName && !color) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
-
-  const nation = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
-
-  if (nationName && nationName !== nation.name) {
-    const taken = await prisma.nation.findFirst({ where: { name: nationName, worldId: "world_01" } });
-    if (taken) return NextResponse.json({ error: "Name already taken" }, { status: 409 });
+  const result = await renameEnclave(session.user.id, parsed.data.nationName);
+  if (!result.ok) {
+    const { message, status } = ERRORS[result.error];
+    return NextResponse.json({ error: message }, { status });
   }
-
-  await prisma.nation.update({
-    where: { id: nation.id },
-    data:  { ...(nationName && { name: nationName }), ...(color && { color }) },
-  });
 
   return NextResponse.json({ success: true });
 }

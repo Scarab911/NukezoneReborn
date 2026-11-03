@@ -15,16 +15,15 @@ export default async function SettingsPage() {
 
   const player = await prisma.player.findUniqueOrThrow({
     where:  { id: session.user.id },
-    select: { email: true, name: true, createdAt: true },
+    select: { email: true, createdAt: true },
   });
 
   return (
     <SettingsContent
       nationName={nation.name}
-      nationColor={nation.color}
       nationStatus={nation.status}
+      nameChangesLeft={nation.nameChangesLeft}
       email={player.email}
-      displayName={player.name ?? ""}
       memberSince={player.createdAt.toISOString()}
       land={nation.resource?.land ?? 0}
       totalUnits={nation.totalUnits}

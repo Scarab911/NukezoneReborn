@@ -1,5 +1,138 @@
 import { prisma } from "@/lib/db";
-import type { Nation, Resource, MoraleRecord } from "@prisma/client";
+import type { Nation, Resource, MoraleRecord, Prisma } from "@prisma/client";
+import { ECONOMY, ENCLAVE, TURNS } from "@/lib/game-constants";
+
+const WORLD_ID = "world_01";
+
+export type FoundEnclaveResult =
+  | { ok: true; nationId: string }
+  | { ok: false; error: "ACTIVE_ENCLAVE_EXISTS" | "NAME_TAKEN" };
+
+export type RenameEnclaveResult =
+  | { ok: true }
+  | { ok: false; error: "NO_ENCLAVE" | "SAME_NAME" | "NO_RENAMES_LEFT" | "NAME_TAKEN" };
+
+/**
+ * A name is taken if any living (non-destroyed) enclave in the world uses it,
+ * case-insensitively. Names of destroyed enclaves are free to reuse.
+ */
+async function isEnclaveNameTaken(
+  db: Prisma.TransactionClient,
+  name: string,
+  excludeNationId?: string,
+): Promise<boolean> {
+  const hit = await db.nation.findFirst({
+    where: {
+      worldId: WORLD_ID,
+      name:    { equals: name, mode: "insensitive" },
+      status:  { not: "DESTROYED" },
+      ...(excludeNationId && { NOT: { id: excludeNationId } }),
+    },
+    select: { id: true },
+  });
+  return hit !== null;
+}
+
+function randomEnclaveColor(): string {
+  return ENCLAVE.COLORS[Math.floor(Math.random() * ENCLAVE.COLORS.length)];
+}
+
+/**
+ * Found a new enclave for the player. If their current enclave was destroyed,
+ * it is detached (kept for battle history) and a fresh one is created.
+ */
+export async function foundEnclave(playerId: string, name: string): Promise<FoundEnclaveResult> {
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.nation.findUnique({
+      where:  { playerId },
+      select: { id: true, status: true },
+    });
+    if (current && current.status !== "DESTROYED") {
+      return { ok: false, error: "ACTIVE_ENCLAVE_EXISTS" } as const;
+    }
+    if (await isEnclaveNameTaken(tx, name)) {
+      return { ok: false, error: "NAME_TAKEN" } as const;
+    }
+
+    if (current) {
+      await tx.nation.update({
+        where: { id: current.id },
+        data:  { playerId: null, formerPlayerId: playerId },
+      });
+    }
+
+    const n = await tx.nation.create({
+      data: {
+        worldId:      WORLD_ID,
+        playerId,
+        name,
+        color:        randomEnclaveColor(),
+        status:       "PROTECTED",
+        turns:        TURNS.STARTING_TURNS,
+        maxTurns:     TURNS.MAX_TURNS,
+        turnsRegenAt: new Date(),
+      },
+    });
+
+    await tx.resource.create({
+      data: {
+        nationId: n.id,
+        money:    ECONOMY.STARTING_MONEY,
+        land:     ECONOMY.STARTING_LAND,
+        energy:   ECONOMY.STARTING_ENERGY,
+      },
+    });
+    await tx.moraleRecord.create({ data: { nationId: n.id, morale: ECONOMY.STARTING_MORALE } });
+    await tx.bankAccount.create({ data: { nationId: n.id, balance: 0 } });
+    await tx.cIRating.create({ data: { nationId: n.id, rating: 10 } });
+    await tx.army.create({ data: { nationId: n.id, name: "Home Guard", status: "STATIONED" } });
+
+    return { ok: true, nationId: n.id } as const;
+  });
+}
+
+/** Rename the player's living enclave, spending one rename. */
+export async function renameEnclave(playerId: string, name: string): Promise<RenameEnclaveResult> {
+  return prisma.$transaction(async (tx) => {
+    const nation = await tx.nation.findUnique({
+      where:  { playerId },
+      select: { id: true, name: true, status: true, nameChangesLeft: true },
+    });
+    if (!nation || nation.status === "DESTROYED") return { ok: false, error: "NO_ENCLAVE" } as const;
+    if (nation.name === name)                     return { ok: false, error: "SAME_NAME" } as const;
+    if (nation.nameChangesLeft <= 0)              return { ok: false, error: "NO_RENAMES_LEFT" } as const;
+    if (await isEnclaveNameTaken(tx, name, nation.id)) {
+      return { ok: false, error: "NAME_TAKEN" } as const;
+    }
+
+    // Conditional update guards against two concurrent renames both passing the check
+    const { count } = await tx.nation.updateMany({
+      where: { id: nation.id, nameChangesLeft: { gt: 0 } },
+      data:  { name, nameChangesLeft: { decrement: 1 } },
+    });
+    if (count === 0) return { ok: false, error: "NO_RENAMES_LEFT" } as const;
+
+    return { ok: true } as const;
+  });
+}
+
+/** Name of the player's enclave if it has been destroyed (shown on the setup screen). */
+export async function getDestroyedEnclaveName(playerId: string): Promise<string | null> {
+  const nation = await prisma.nation.findUnique({
+    where:  { playerId },
+    select: { name: true, status: true },
+  });
+  return nation?.status === "DESTROYED" ? nation.name : null;
+}
+
+/** Whether the player owns a living (non-destroyed) enclave. */
+export async function hasLivingEnclave(playerId: string): Promise<boolean> {
+  const nation = await prisma.nation.findUnique({
+    where:  { playerId },
+    select: { status: true },
+  });
+  return nation !== null && nation.status !== "DESTROYED";
+}
 
 export type NationSnapshot = Nation & {
   resource:  Resource | null;

@@ -125,3 +125,15 @@ export const MARKET = {
   MAX_ORDERS:    10,
   MIN_ORDER_QTY: 10,
 } as const;
+
+// ── Enclave identity ──────────────────────────────────────────────────────
+export const ENCLAVE = {
+  NAME_MIN:          2,
+  NAME_MAX:          32,
+  STARTING_RENAMES:  1,  // matches Nation.nameChangesLeft default
+  // Assigned at random on founding — players don't pick colors
+  COLORS: [
+    "#ef4444", "#f97316", "#eab308", "#22c55e",
+    "#3b82f6", "#a855f7", "#ec4899", "#14b8a6",
+  ],
+} as const;

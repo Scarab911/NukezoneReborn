@@ -9,42 +9,38 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-const COLORS = [
-  "#ef4444","#f97316","#eab308","#22c55e",
-  "#3b82f6","#a855f7","#ec4899","#14b8a6",
-];
-
 interface Props {
-  nationName:   string;
-  nationColor:  string;
-  nationStatus: string;
-  email:        string;
-  displayName:  string;
+  nationName:      string;
+  nationStatus:    string;
+  nameChangesLeft: number;
+  email:           string;
   memberSince:  string;
   land:         number;
   totalUnits:   number;
 }
 
 export function SettingsContent({
-  nationName, nationColor, nationStatus, email, displayName, memberSince, land, totalUnits,
+  nationName, nationStatus, nameChangesLeft, email, memberSince, land, totalUnits,
 }: Props) {
   const router = useRouter();
-  const [color,    setColor]    = useState(nationColor);
   const [newName,  setNewName]  = useState(nationName);
   const [busy,     setBusy]     = useState(false);
 
-  async function saveNation() {
-    if (!newName.trim() || busy) return;
+  const trimmed   = newName.trim();
+  const canRename = nameChangesLeft > 0 && trimmed.length >= 2 && trimmed !== nationName && !busy;
+
+  async function renameEnclave() {
+    if (!canRename) return;
     setBusy(true);
     const res = await fetch("/api/game/settings/nation", {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ color, nationName: newName.trim() }),
+      body:    JSON.stringify({ nationName: trimmed }),
     });
     const data = await res.json() as { error?: string };
     setBusy(false);
-    if (!res.ok) { toast.error(data.error ?? "Save failed"); return; }
-    toast.success("Enclave settings saved");
+    if (!res.ok) { toast.error(data.error ?? "Rename failed"); return; }
+    toast.success(`Enclave renamed to ${trimmed}`);
     router.refresh();
   }
 
@@ -69,11 +65,6 @@ export function SettingsContent({
           <div className="flex justify-between text-sm">
             <span className="text-slate-500">Member since</span>
             <span className="text-slate-300 text-xs">{new Date(memberSince).toLocaleDateString()}</span>
-          </div>
-          <Separator className="bg-slate-800" />
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Display name</span>
-            <span className="text-slate-300 text-xs">{displayName}</span>
           </div>
         </CardContent>
       </Card>
@@ -109,41 +100,22 @@ export function SettingsContent({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               maxLength={32}
+              disabled={nameChangesLeft <= 0}
               className="bg-slate-800 border-slate-700 text-slate-100 h-8 text-sm"
             />
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs text-slate-500">Enclave Color</p>
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className="w-8 h-8 rounded-full border-2 transition-all"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: color === c ? "white" : "transparent",
-                    transform:   color === c ? "scale(1.15)" : "scale(1)",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-center gap-3 rounded border border-slate-700 bg-slate-800/50 px-3 py-2">
-            <span className="w-4 h-4 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-slate-200 text-sm font-semibold">{newName || "Your Enclave"}</span>
+            <p className="text-xs text-slate-500">
+              {nameChangesLeft > 0
+                ? `You can change your enclave name ${nameChangesLeft} more ${nameChangesLeft === 1 ? "time" : "times"}. This can't be undone.`
+                : "You have no name changes left."}
+            </p>
           </div>
 
           <button
-            onClick={saveNation}
-            disabled={busy}
+            onClick={renameEnclave}
+            disabled={!canRename}
             className="w-full h-8 text-sm font-semibold rounded bg-blue-800 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors"
           >
-            {busy ? "Saving…" : "Save Enclave Settings"}
+            {busy ? "Renaming…" : "Change Name"}
           </button>
         </CardContent>
       </Card>

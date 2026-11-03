@@ -17,7 +17,8 @@ export default async function GameLayout({ children }: { children: React.ReactNo
     include: { resource: true },
   });
 
-  if (!nation) redirect("/setup");
+  // No enclave yet, or it was destroyed → found a (new) one
+  if (!nation || nation.status === "DESTROYED") redirect("/setup");
 
   // Keep turns in sync and mark the player online on every game page load
   await Promise.all([syncTurns(nation.id), touchPlayerActivity(session.user.id)]);

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { ECONOMY, TURNS } from "@/lib/game-constants";
+import { ENCLAVE } from "@/lib/game-constants";
 import { syncTurns } from "@/server/game-engine/turns";
+import { foundEnclave } from "@/server/services/nation.service";
 
 const CreateNationSchema = z.object({
-  nationName: z.string().min(2).max(32).trim(),
-  color:      z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#22c55e"),
+  nationName: z.string().trim().min(ENCLAVE.NAME_MIN).max(ENCLAVE.NAME_MAX),
 });
 
 export async function GET() {
@@ -32,48 +32,16 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const existing = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (existing) return NextResponse.json({ error: "Enclave already exists." }, { status: 409 });
-
   const body: unknown = await req.json();
   const parsed = CreateNationSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input." }, { status: 400 });
 
-  const { nationName, color } = parsed.data;
+  const result = await foundEnclave(session.user.id, parsed.data.nationName);
+  if (!result.ok) {
+    return result.error === "NAME_TAKEN"
+      ? NextResponse.json({ error: "Enclave name already taken." }, { status: 409 })
+      : NextResponse.json({ error: "Enclave already exists." },     { status: 409 });
+  }
 
-  const nameTaken = await prisma.nation.findFirst({ where: { name: nationName, worldId: "world_01" } });
-  if (nameTaken) return NextResponse.json({ error: "Enclave name already taken." }, { status: 409 });
-
-  const nation = await prisma.$transaction(async (tx) => {
-    const n = await tx.nation.create({
-      data: {
-        worldId:      "world_01",
-        playerId:     session.user!.id,
-        name:         nationName,
-        color,
-        status:       "PROTECTED",
-        turns:        TURNS.STARTING_TURNS,
-        maxTurns:     TURNS.MAX_TURNS,
-        turnsRegenAt: new Date(),
-      },
-    });
-
-    await tx.resource.create({
-      data: {
-        nationId:   n.id,
-        money:  ECONOMY.STARTING_MONEY,
-        land:   ECONOMY.STARTING_LAND,
-        energy: ECONOMY.STARTING_ENERGY,
-      },
-    });
-
-    await tx.moraleRecord.create({ data: { nationId: n.id, morale: ECONOMY.STARTING_MORALE } });
-    await tx.bankAccount.create({ data: { nationId: n.id, balance: 0 } });
-    await tx.cIRating.create({ data: { nationId: n.id, rating: 10 } });
-    await tx.army.create({ data: { nationId: n.id, name: "Home Guard", status: "STATIONED" } });
-
-    return n;
-  });
-
-  return NextResponse.json({ success: true, nationId: nation.id }, { status: 201 });
+  return NextResponse.json({ success: true, nationId: result.nationId }, { status: 201 });
 }

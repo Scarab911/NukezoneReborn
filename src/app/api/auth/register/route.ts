@@ -4,7 +4,6 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 
 const RegisterSchema = z.object({
-  name:     z.string().min(2).max(32),
   email:    z.string().email(),
   password: z.string().min(8).max(128),
 });
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, email, password } = parsed.data;
+  const { email, password } = parsed.data;
 
   const existing = await prisma.player.findUnique({ where: { email } });
   if (existing) {
@@ -32,11 +31,7 @@ export async function POST(req: NextRequest) {
   await prisma.player.create({
     data: {
       email,
-      name,
       passwordHash,
-      profile: {
-        create: { displayName: name },
-      },
     },
   });
 

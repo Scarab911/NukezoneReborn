@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -36,7 +35,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json() as { error?: string };
@@ -68,17 +67,6 @@ export default function RegisterPage() {
               {error}
             </p>
           )}
-          <div className="space-y-1.5">
-            <Label htmlFor="name" className="text-slate-300">Display Name</Label>
-            <Input
-              id="name"
-              placeholder="Commander"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500"
-            />
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-slate-300">Email</Label>
             <Input
