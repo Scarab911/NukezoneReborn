@@ -4,6 +4,35 @@
 
 ---
 
+## Session: 2026-11-03 — Enclave Identity
+
+### What Was Done
+- **"Nation" → "Enclave" in all player-facing text** (UI copy + API error messages). Internal code, Prisma `Nation` model, routes (`/api/game/nation`) and `nation.service.ts` intentionally keep "nation" (`de4fa24`)
+- **Landing page "enclaves founded" counter** — `countNationsFounded()` (`de4fa24`)
+- **Identity model reworked** (`11baa25`):
+  - Registration = email + password only. Display name removed from form/API; no `UserProfile` created on register (`Player.name` / `UserProfile` now unused)
+  - `/setup` = enclave name only; color assigned at random from `ENCLAVE.COLORS`. `/setup` is now a server page (redirects players with a living enclave to `/dashboard`) + client `SetupForm.tsx`
+  - Settings: display name + color picker removed; enclave name can be changed **once** (`Nation.nameChangesLeft`, default 1)
+  - Restart after destruction: game layout redirects `DESTROYED` enclaves to `/setup` ("Rise From the Ashes"); founding detaches the old record (`playerId → null`, `formerPlayerId` kept) so battle history survives
+  - Enclave names unique **case-insensitively among living enclaves**; destroyed enclaves' names are reusable
+  - Founding/renaming logic moved to `nation.service.ts` (`foundEnclave`, `renameEnclave`, `hasLivingEnclave`, `getDestroyedEnclaveName`)
+- **DB migration (Supabase MCP)**: `Nation.playerId` nullable; added `formerPlayerId TEXT` (indexed) and `nameChangesLeft INT NOT NULL DEFAULT 1`
+- **DB reset**: all player/game tables truncated. Seed kept: 1 GameWorld, 18 UnitType, 13 TechNode. Register a fresh account to test
+
+### Design Decisions (from the owner)
+- One world (server), one enclave per player. Players are known **only by their enclave name** — no separate player/commander name
+- Destroyed enclave → player starts from scratch with a new name
+- Renames: once for now → later once per round/season; VIP subscribers get extra renames (top up `nameChangesLeft`)
+
+### Not Yet Verified
+- New flows were type-checked and linted but **not exercised in the running app** (dev server was stopped by low system memory). First thing next session: register → setup → rename once → confirm second rename is blocked
+
+### Open Issues Found
+- **Nothing ever sets `status = DESTROYED`** — the destruction mechanic doesn't exist yet, so the restart flow is dormant. When building it, also: remove the enclave from its alliance, hide destroyed enclaves from rankings/target/message lists, and block all mutating API routes for destroyed enclaves (today only explore + attack check)
+- `Player.name` and `UserProfile` are now dead data — decide whether to drop them
+
+---
+
 ## Session: 2026-10-30 — Migration to New PC + Audit
 
 ### What Was Done
@@ -48,16 +77,16 @@
 
 ```
 / (landing)          ✅ Dark UI, logged-in redirect
-/register            ✅ Creates Player + profile
+/register            ✅ Email + password only
 /login               ✅ Credentials auth
-/setup               ✅ Create nation (name + color picker)
+/setup               ✅ Found enclave (name only, random color); restart after destruction
 /dashboard           ✅ Turns bar, morale, resources, ExplorePanel, economy tick
 /arsenal             ✅ 18 units in 5 tabs, counter hints, instant training
 /research            ✅ Tech tree, live countdown, auto-complete
 /military            ✅ Target list, instant attack, battle report inline
 /buildings           ✅ 7 building types, build form, land/money cost
 /defense             ✅ Tower/silo/CI stats, improvement guide
-/settings            ✅ Nation name/color editor
+/settings            ✅ One-time enclave rename
 /rankings            ✅ Power score leaderboard
 /bank                ✅ Deposit/withdraw, 2% fee, transaction history
 /market              ✅ Buy/sell orders (money/land/energy), cancel
@@ -69,6 +98,8 @@
 **M4 — Social & Economy Full** (M3 complete)
 
 ### Immediate Next Actions (priority order)
+
+0. **Verify enclave identity flows** in the running app (see 2026-11-03 "Not Yet Verified")
 
 1. **Security**: decide on enabling RLS for all public tables (see Open Issues above)
 

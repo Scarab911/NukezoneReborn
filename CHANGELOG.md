@@ -5,6 +5,17 @@ Format: `## [version or date] — Description`
 
 ---
 
+## [2026-11-03] — Enclave Identity
+
+- **Changed**: "nation" → "enclave" in all player-facing text (code/DB names unchanged)
+- **Added**: "enclaves founded" counter on landing page
+- **Removed**: display name from registration; color picker from setup and settings (color now random)
+- **Added**: one-time enclave rename in settings (`Nation.nameChangesLeft`)
+- **Added**: restart flow — destroyed enclaves redirect to `/setup`; old record detached via `formerPlayerId`
+- **Changed**: enclave names unique case-insensitively among living enclaves
+- **DB migration** (Supabase MCP): `Nation.playerId` nullable, `formerPlayerId`, `nameChangesLeft`
+- **DB reset**: player/game data truncated; seed data kept
+
 ## [2026-05-15] — Major Redesign: Turn-Based Instant Combat
 
 - **Removed**: HP system, territory map, coordinates, travel time, ArmyMovement, food/steel resources

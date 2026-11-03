@@ -1,6 +1,6 @@
 # TODO.md — NukezoneReborn
 
-Last updated: 2026-10-30
+Last updated: 2026-11-03
 
 ---
 
@@ -17,6 +17,10 @@ Last updated: 2026-10-30
 | Exploration | Diminishing returns (500→10 land, 1→N turns) | Passive land growth mechanic |
 | Units | 18 named types across 5 categories | Redesigned from 30 generic types |
 | Buildings | Multiplier-only, consume land | Upgrade path without map complexity |
+| Player identity | Enclave name only (no player/display name) | One world, one enclave per player |
+| Terminology | "Enclave" in UI; `Nation` stays in code/DB | Post-apocalyptic fit without a risky rename |
+| Destruction | Player restarts from scratch with a new name | Old record kept for history (`formerPlayerId`) |
+| Renames | Once per enclave → once per round later; VIPs get extra | Stored as `Nation.nameChangesLeft` |
 
 ---
 
@@ -57,7 +61,7 @@ Last updated: 2026-10-30
 - [x] Economy tick: passive income + upkeep on 30s poll
 - [x] Buildings page: 7 types, build form, land/money cost
 - [x] Defense page: tower/silo/CI stats + improvement guide
-- [x] Settings page: nation name/color editor
+- [x] Settings page: nation name/color editor (2026-11-03: now one-time enclave rename only)
 - [x] Mobile sidebar: hamburger + slide-in drawer
 - [x] Land exploration: diminishing returns, ExplorePanel on Dashboard
 
@@ -70,6 +74,15 @@ Last updated: 2026-10-30
 ---
 
 ## 🔜 REMAINING
+
+### Enclave Identity (follow-ups)
+- [ ] Verify in running app: register → setup → rename once → second rename blocked
+- [ ] Destruction mechanic: set `status = DESTROYED` (combat/nukes); the restart flow is already wired to it
+- [ ] On destruction: remove from alliance; hide destroyed enclaves from rankings, military targets, message recipients
+- [ ] Block all mutating API routes for destroyed enclaves (only explore + attack check today)
+- [ ] Decide: drop unused `Player.name` / `UserProfile` (no longer written on register)
+- [ ] Future: reset `nameChangesLeft` per round/season; extra renames for VIP subscribers
+- [ ] Optional: DB-level unique index on living enclave names (currently app-level check only)
 
 ### Security
 - [ ] Enable RLS on all 45 public tables (currently exposed to Supabase anon key; Prisma bypasses RLS)
