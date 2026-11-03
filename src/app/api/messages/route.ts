@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   const { targetNationId, message } = parsed.data;
 
   const senderNation = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (!senderNation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!senderNation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const targetNation = await prisma.nation.findUnique({ where: { id: targetNationId } });
   if (!targetNation) return NextResponse.json({ error: "Target not found" }, { status: 404 });

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     where:   { playerId: session.user.id },
     include: { allianceMember: true },
   });
-  if (!nation)               return NextResponse.json({ error: "No nation" },              { status: 404 });
+  if (!nation)               return NextResponse.json({ error: "No enclave" },              { status: 404 });
   if (nation.allianceMember) return NextResponse.json({ error: "Already in an alliance" }, { status: 409 });
 
   const alliance = await prisma.alliance.findFirst({

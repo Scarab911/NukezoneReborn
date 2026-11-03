@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     prisma.techNode.findUnique({ where: { id: techNodeId } }),
   ]);
 
-  if (!nation)   return NextResponse.json({ error: "No nation"    }, { status: 404 });
+  if (!nation)   return NextResponse.json({ error: "No enclave"    }, { status: 404 });
   if (!techNode) return NextResponse.json({ error: "Unknown tech" }, { status: 404 });
 
   // Check already researched or in progress

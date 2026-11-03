@@ -40,7 +40,7 @@ export default function SetupPage() {
     const data = await res.json() as { error?: string };
 
     if (!res.ok) {
-      setError(data.error ?? "Failed to create nation.");
+      setError(data.error ?? "Failed to create enclave.");
       setLoading(false);
       return;
     }
@@ -54,7 +54,7 @@ export default function SetupPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Zap className="w-10 h-10 text-red-500 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-slate-100">Found Your Nation</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Found Your Enclave</h1>
           <p className="text-slate-400 text-sm mt-2">
             Choose a name and color. This will be your identity in the nuclear age.
           </p>
@@ -70,7 +70,7 @@ export default function SetupPage() {
               )}
 
               <div className="space-y-1.5">
-                <Label htmlFor="nationName" className="text-slate-300">Nation Name</Label>
+                <Label htmlFor="nationName" className="text-slate-300">Enclave Name</Label>
                 <Input
                   id="nationName"
                   placeholder="e.g. Iron Dominion"
@@ -84,7 +84,7 @@ export default function SetupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">Nation Color</Label>
+                <Label className="text-slate-300">Enclave Color</Label>
                 <div className="flex flex-wrap gap-2">
                   {COLORS.map((c) => (
                     <button
@@ -111,9 +111,9 @@ export default function SetupPage() {
                 />
                 <div>
                   <p className="text-slate-200 font-semibold text-sm">
-                    {nationName || "Your Nation"}
+                    {nationName || "Your Enclave"}
                   </p>
-                  <p className="text-slate-500 text-xs">New nation · World 1</p>
+                  <p className="text-slate-500 text-xs">New enclave · World 1</p>
                 </div>
               </div>
             </CardContent>
@@ -124,7 +124,7 @@ export default function SetupPage() {
                 disabled={loading || nationName.length < 2}
                 className="w-full bg-red-700 hover:bg-red-600 text-white font-semibold tracking-wide"
               >
-                {loading ? "Founding nation..." : "Found Nation"}
+                {loading ? "Founding enclave..." : "Found Enclave"}
               </Button>
             </CardFooter>
           </form>

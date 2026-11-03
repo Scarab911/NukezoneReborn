@@ -10,18 +10,18 @@ interface NationEntry {
 
 export function RankingsContent({ nations }: { nations: NationEntry[] }) {
   if (nations.length === 0) {
-    return <div className="text-center py-20 text-slate-500">No nations yet.</div>;
+    return <div className="text-center py-20 text-slate-500">No enclaves yet.</div>;
   }
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Rankings</h1>
-        <p className="text-slate-500 text-sm mt-0.5">World 1 — {nations.length} nations · Score = units×10 + land×5 + battles×50</p>
+        <p className="text-slate-500 text-sm mt-0.5">World 1 — {nations.length} enclaves · Score = units×10 + land×5 + battles×50</p>
       </div>
 
       <div className="hidden md:grid grid-cols-[3rem_1fr_6rem_6rem_6rem_6rem] gap-4 px-4 text-xs text-slate-500 uppercase tracking-wider">
-        <span>#</span><span>Nation</span>
+        <span>#</span><span>Enclave</span>
         <span className="text-right">Score</span><span className="text-right">Units</span>
         <span className="text-right">Land</span><span className="text-right">Morale</span>
       </div>

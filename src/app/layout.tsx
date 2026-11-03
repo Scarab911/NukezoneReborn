@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "NukezoneReborn — Nuclear War Strategy MMO",
-  description: "Build your nation, arm your arsenal, dominate the nuclear age.",
+  description: "Build your enclave, arm your arsenal, dominate the nuclear age.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -74,7 +74,7 @@ export function MessagesContent({ notifications, nations }: Props) {
             onChange={(e) => setTarget(e.target.value)}
             className="w-full h-8 text-sm rounded bg-slate-800 border border-slate-700 text-slate-100 px-2"
           >
-            <option value="">Select nation…</option>
+            <option value="">Select enclave…</option>
             {nations.map((n) => (
               <option key={n.id} value={n.id}>{n.name}</option>
             ))}

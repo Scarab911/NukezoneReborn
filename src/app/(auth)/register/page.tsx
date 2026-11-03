@@ -57,7 +57,7 @@ export default function RegisterPage() {
       <CardHeader>
         <CardTitle className="text-slate-100">Create Account</CardTitle>
         <CardDescription className="text-slate-400">
-          Join the nuclear age. Build your nation.
+          Join the nuclear age. Build your enclave.
         </CardDescription>
       </CardHeader>
 
@@ -84,7 +84,7 @@ export default function RegisterPage() {
             <Input
               id="email"
               type="email"
-              placeholder="commander@nation.com"
+              placeholder="commander@enclave.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

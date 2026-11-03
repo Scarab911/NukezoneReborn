@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const existing = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (existing) return NextResponse.json({ error: "Nation already exists." }, { status: 409 });
+  if (existing) return NextResponse.json({ error: "Enclave already exists." }, { status: 409 });
 
   const body: unknown = await req.json();
   const parsed = CreateNationSchema.safeParse(body);
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const { nationName, color } = parsed.data;
 
   const nameTaken = await prisma.nation.findFirst({ where: { name: nationName, worldId: "world_01" } });
-  if (nameTaken) return NextResponse.json({ error: "Nation name already taken." }, { status: 409 });
+  if (nameTaken) return NextResponse.json({ error: "Enclave name already taken." }, { status: 409 });
 
   const nation = await prisma.$transaction(async (tx) => {
     const n = await tx.nation.create({

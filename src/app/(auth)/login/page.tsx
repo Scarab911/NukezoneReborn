@@ -43,7 +43,7 @@ export default function LoginPage() {
       <CardHeader>
         <CardTitle className="text-slate-100">Sign In</CardTitle>
         <CardDescription className="text-slate-400">
-          Enter your credentials to access your nation
+          Enter your credentials to access your enclave
         </CardDescription>
       </CardHeader>
 
@@ -59,7 +59,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="commander@nation.com"
+              placeholder="commander@enclave.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

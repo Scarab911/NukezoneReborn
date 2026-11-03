@@ -20,6 +20,11 @@ export async function getNationById(nationId: string): Promise<NationSnapshot | 
   });
 }
 
+/** Total nations ever founded (all statuses, including destroyed). */
+export async function countNationsFounded(): Promise<number> {
+  return prisma.nation.count();
+}
+
 export async function getNationsByWorld(worldId: string): Promise<NationSnapshot[]> {
   return prisma.nation.findMany({
     where: { worldId, status: { in: ["ACTIVE", "PROTECTED"] } },

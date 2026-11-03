@@ -44,7 +44,7 @@ export function SettingsContent({
     const data = await res.json() as { error?: string };
     setBusy(false);
     if (!res.ok) { toast.error(data.error ?? "Save failed"); return; }
-    toast.success("Nation settings saved");
+    toast.success("Enclave settings saved");
     router.refresh();
   }
 
@@ -52,7 +52,7 @@ export function SettingsContent({
     <div className="space-y-6 max-w-lg">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Account and nation preferences</p>
+        <p className="text-slate-500 text-sm mt-0.5">Account and enclave preferences</p>
       </div>
 
       {/* Account info */}
@@ -78,10 +78,10 @@ export function SettingsContent({
         </CardContent>
       </Card>
 
-      {/* Nation settings */}
+      {/* Enclave settings */}
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-slate-200 text-sm">Nation</CardTitle>
+          <CardTitle className="text-slate-200 text-sm">Enclave</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-between text-sm">
@@ -104,7 +104,7 @@ export function SettingsContent({
           <Separator className="bg-slate-800" />
 
           <div className="space-y-1.5">
-            <p className="text-xs text-slate-500">Nation Name</p>
+            <p className="text-xs text-slate-500">Enclave Name</p>
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -114,7 +114,7 @@ export function SettingsContent({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-slate-500">Nation Color</p>
+            <p className="text-xs text-slate-500">Enclave Color</p>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
@@ -135,7 +135,7 @@ export function SettingsContent({
           {/* Preview */}
           <div className="flex items-center gap-3 rounded border border-slate-700 bg-slate-800/50 px-3 py-2">
             <span className="w-4 h-4 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-slate-200 text-sm font-semibold">{newName || "Your Nation"}</span>
+            <span className="text-slate-200 text-sm font-semibold">{newName || "Your Enclave"}</span>
           </div>
 
           <button
@@ -143,7 +143,7 @@ export function SettingsContent({
             disabled={busy}
             className="w-full h-8 text-sm font-semibold rounded bg-blue-800 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors"
           >
-            {busy ? "Saving…" : "Save Nation Settings"}
+            {busy ? "Saving…" : "Save Enclave Settings"}
           </button>
         </CardContent>
       </Card>

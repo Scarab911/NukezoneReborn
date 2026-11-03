@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest) {
   if (!nationName && !color) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
   const nation = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   if (nationName && nationName !== nation.name) {
     const taken = await prisma.nation.findFirst({ where: { name: nationName, worldId: "world_01" } });

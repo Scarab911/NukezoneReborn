@@ -7,7 +7,7 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const nation = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const [armies, unitTypes, trainingQueue] = await Promise.all([
     prisma.army.findMany({

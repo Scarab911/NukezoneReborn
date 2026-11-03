@@ -24,7 +24,7 @@ export async function GET() {
     },
   });
 
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   return NextResponse.json({
     money:       nation.resource?.money       ?? 0,
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     where:   { playerId: session.user.id },
     include: { resource: true, bankAccount: true },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const cash    = nation.resource?.money    ?? 0;
   const balance = nation.bankAccount?.balance ?? 0;

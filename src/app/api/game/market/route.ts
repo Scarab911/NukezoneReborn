@@ -18,7 +18,7 @@ export async function GET() {
     where:   { playerId: session.user.id },
     include: { resource: true },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const [openOrders, myOrders] = await Promise.all([
     prisma.marketOrder.findMany({
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     where:   { playerId: session.user.id },
     include: { resource: true },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   // Check open order limit
   const openCount = await prisma.marketOrder.count({
@@ -108,7 +108,7 @@ export async function DELETE(req: NextRequest) {
   if (!orderId) return NextResponse.json({ error: "Missing order id" }, { status: 400 });
 
   const nation = await prisma.nation.findUnique({ where: { playerId: session.user.id } });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const order = await prisma.marketOrder.findFirst({
     where: { id: orderId, nationId: nation.id, status: { in: ["OPEN", "PARTIAL"] } },

@@ -78,7 +78,7 @@ export function DashboardContent({ nation, morale, resources }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">{nation.name}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Nation Overview</p>
+          <p className="text-slate-500 text-sm mt-0.5">Enclave Overview</p>
         </div>
         <Badge
           variant={nation.status === "ACTIVE" ? "outline" : "destructive"}

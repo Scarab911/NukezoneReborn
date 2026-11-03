@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     prisma.unitType.findUnique({ where: { id: unitTypeId } }),
   ]);
 
-  if (!nation)   return NextResponse.json({ error: "No nation"    }, { status: 404 });
+  if (!nation)   return NextResponse.json({ error: "No enclave"    }, { status: 404 });
   if (!unitType) return NextResponse.json({ error: "Unknown unit" }, { status: 404 });
 
   if (unitType.requiresTech) {

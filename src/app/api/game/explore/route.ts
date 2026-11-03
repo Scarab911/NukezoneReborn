@@ -22,9 +22,9 @@ export async function POST() {
       where:   { playerId: session.user.id },
       include: { resource: true },
     });
-    if (!nation)            return NextResponse.json({ error: "No nation" }, { status: 404 });
-    if (!nation.resource)   return NextResponse.json({ error: "Nation has no resources" }, { status: 500 });
-    if (nation.status === "DESTROYED") return NextResponse.json({ error: "Nation destroyed" }, { status: 403 });
+    if (!nation)            return NextResponse.json({ error: "No enclave" }, { status: 404 });
+    if (!nation.resource)   return NextResponse.json({ error: "Enclave has no resources" }, { status: 500 });
+    if (nation.status === "DESTROYED") return NextResponse.json({ error: "Enclave destroyed" }, { status: 403 });
 
     const currentLand = nation.resource.land;
     if (currentLand >= ECONOMY.LAND_MAX) {
@@ -78,7 +78,7 @@ export async function GET() {
     where:  { playerId: session.user.id },
     select: { explorationCount: true, resource: { select: { land: true } } },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const { turnCost, landGained } = calcExplore(nation.explorationCount);
   return NextResponse.json({

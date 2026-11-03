@@ -2,12 +2,16 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { countOnlinePlayers } from "@/server/services/presence.service";
+import { countNationsFounded } from "@/server/services/nation.service";
 
 export default async function LandingPage() {
   const session = await auth();
   if (session?.user) redirect("/dashboard");
 
-  const onlineCount = await countOnlinePlayers().catch(() => 0);
+  const [onlineCount, nationCount] = await Promise.all([
+    countOnlinePlayers().catch(() => 0),
+    countNationsFounded().catch(() => 0),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -38,16 +42,22 @@ export default async function LandingPage() {
       {/* Hero */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-emerald-950/40 border border-emerald-900/50 rounded-full px-4 py-1.5 text-sm text-emerald-400 mb-8">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+          <div className="inline-flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-full px-4 py-1.5 text-sm text-slate-400 mb-8">
+            <span className="inline-flex items-center gap-2 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              <span>
+                <span className="font-bold tabular-nums">{onlineCount.toLocaleString()}</span> online
+              </span>
+            </span>
+            <span className="w-px h-3.5 bg-slate-700" aria-hidden />
             <span>
-              <span className="font-bold tabular-nums">{onlineCount.toLocaleString()}</span>{" "}
-              {onlineCount === 1 ? "commander" : "commanders"} online
+              <span className="font-bold tabular-nums text-slate-200">{nationCount.toLocaleString()}</span>{" "}
+              {nationCount === 1 ? "enclave" : "enclaves"} founded
             </span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-black tracking-tight text-slate-50 mb-6 leading-tight">
-            Build Your Nation.<br />
+            Build Your Enclave.<br />
             <span className="text-red-500">Arm Your Arsenal.</span>
           </h1>
 
@@ -61,7 +71,7 @@ export default async function LandingPage() {
               href="/register"
               className="px-8 py-3 text-base font-bold bg-red-700 hover:bg-red-600 text-white rounded-lg transition-colors tracking-wide"
             >
-              Found Your Nation — Free
+              Found Your Enclave — Free
             </Link>
             <Link
               href="/login"

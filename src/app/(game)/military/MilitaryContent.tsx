@@ -238,13 +238,13 @@ export function MilitaryContent({
               {FILTER_LABEL[f]}
             </button>
           ))}
-          <span className="ml-auto text-xs text-slate-500 self-center">{processed.length} nations</span>
+          <span className="ml-auto text-xs text-slate-500 self-center">{processed.length} enclaves</span>
         </div>
       </div>
 
       {/* Target cards */}
       {processed.length === 0 && (
-        <p className="text-slate-500 text-sm py-8 text-center">No nations match your filter.</p>
+        <p className="text-slate-500 text-sm py-8 text-center">No enclaves match your filter.</p>
       )}
 
       <div className="space-y-2">

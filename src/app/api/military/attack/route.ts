@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!attackerNation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!attackerNation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
   if (attackerNation.id === targetNationId) return NextResponse.json({ error: "Cannot attack yourself" }, { status: 400 });
-  if (attackerNation.status === "DESTROYED") return NextResponse.json({ error: "Your nation is destroyed" }, { status: 403 });
+  if (attackerNation.status === "DESTROYED") return NextResponse.json({ error: "Your enclave is destroyed" }, { status: 403 });
 
   // Handle attacker protection
   let attackerLostProtection = false;
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
   if (defenderNation.status === "PROTECTED") {
     const expired = await liftProtectionIfExpired(defenderNation.id, defenderNation.createdAt);
     if (!expired) {
-      return NextResponse.json({ error: "Target nation is under protection" }, { status: 403 });
+      return NextResponse.json({ error: "Target enclave is under protection" }, { status: 403 });
     }
     defenderNation.status = "ACTIVE";
   }

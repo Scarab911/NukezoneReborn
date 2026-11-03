@@ -19,7 +19,7 @@ export async function GET() {
     where:   { playerId: session.user.id },
     include: { resource: true, buildings: true },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   return NextResponse.json({
     money:     nation.resource?.money  ?? 0,
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     where:   { playerId: session.user.id },
     include: { resource: true, buildings: true },
   });
-  if (!nation) return NextResponse.json({ error: "No nation" }, { status: 404 });
+  if (!nation) return NextResponse.json({ error: "No enclave" }, { status: 404 });
 
   const existing = nation.buildings.find((b) => b.type === type);
   const currentCount = existing?.count ?? 0;
