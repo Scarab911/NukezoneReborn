@@ -119,6 +119,9 @@ model Nation {
   // Renames left. Reset per round / topped up for VIPs in the future.
   nameChangesLeft Int      @default(1)
   status      NationStatus @default(ACTIVE)
+  // End of the current shield (new-player protection or ruin shield).
+  // Only meaningful while status = PROTECTED.
+  protectedUntil DateTime?
   // Turn system — regenerates 1/5min, max 100
   turns       Int          @default(50)
   maxTurns    Int          @default(100)

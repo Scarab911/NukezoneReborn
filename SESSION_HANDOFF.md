@@ -4,6 +4,27 @@
 
 ---
 
+## Session: 2026-11-03 (later) — Attack Range + Ruin Shield
+
+### What Was Done
+- **Networth + attack range** (`src/lib/networth.ts`): `calcNetworth`, `attackRange`, `rangeStatus`, `landTakenOnWin`. Range is `myNW × 0.5 ≤ targetNW ≤ myNW ÷ 0.5` — always mutual. Dashboard, military and rankings now use the shared formula (rankings still adds battles × 50 to its score)
+- **Attack route**: range check (403), destroyed targets rejected; the attacker-protection check now runs last, so a rejected attack never costs the attacker's shield
+- **Ruin, not destruction** (`combat.ts`): land taken = 5% but never below `COMBAT.LAND_FLOOR` (100). If the defender ends at the floor, `grantRuinShield` sets PROTECTED for 24h (`COMBAT.RUIN_SHIELD_HOURS`); defender notification payload carries `shieldUntil`
+- **`protection.service.ts`**: protection based on `Nation.protectedUntil` (new column); founding sets now + 72h
+- **Military UI**: "Your range: X – Y"; out-of-range targets dimmed with "Too weak"/"Too strong", attack disabled; "In range" filter is the default
+- **Abandon enclave**: Settings → type the name to confirm → `abandonEnclave()` (leaves alliance — leadership passes to an officer or longest-serving member; empty alliance disbanded) → DESTROYED → `/setup`
+- **DB migration (Supabase MCP)**: `Nation.protectedUntil TIMESTAMP(3)` nullable, backfilled for PROTECTED rows
+
+### Not Yet Verified
+- Type-check, lint and a range-maths check (symmetry, bounds, land floor) pass. **Not exercised in the running app** — needs 2–3 test accounts
+
+### Open Issues Found
+- **Battles never remove lost units** — `attackerLost`/`defenderLost` are only written to the report; `ArmyUnit.quantity` and `Nation.totalUnits` stay unchanged. Networth therefore never drops from losing units; only land changes
+- An enclave that never grows past 100 land gets a fresh 24h shield after every lost battle (shield farming) — watch for it
+- Buildings aren't removed when land is lost
+
+---
+
 ## Session: 2026-11-03 — Enclave Identity
 
 ### What Was Done

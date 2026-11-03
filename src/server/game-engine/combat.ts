@@ -1,5 +1,7 @@
 import { COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
+import { landTakenOnWin } from "@/lib/networth";
+import { grantRuinShield } from "@/server/services/protection.service";
 import type { Resource, MoraleRecord, UnitType, Building } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -171,7 +173,7 @@ export function resolveInstant(
   if (attackerWins) {
     atkLost     = Math.ceil(atkTotal * COMBAT.ATTACKER_LOSS_PCT);
     defLost     = Math.ceil(defTotal * COMBAT.DEFENDER_LOSS_PCT);
-    landGained  = Math.max(1, Math.floor((defender.resource?.land ?? 0) * COMBAT.LAND_STEAL_PCT));
+    landGained  = landTakenOnWin(defender.resource?.land ?? 0);
     moneyStolen = Math.floor((defender.resource?.money ?? 0) * COMBAT.MONEY_STEAL_PCT);
     atkMorale   = MORALE.WIN_ATTACK;
     defMorale   = MORALE.LOSE_ATTACK;
@@ -183,8 +185,11 @@ export function resolveInstant(
   }
 
   const winner = attackerWins ? "ATTACKER" : "DEFENDER";
+  const landText = landGained > 0
+    ? `Seized ${landGained} land and`
+    : `${defender.name} has no land left to take. Seized`;
   const summary = attackerWins
-    ? `${attacker.name} overpowered ${defender.name} (${Math.round(effective)} vs ${defPower}). Seized ${landGained} land and ${moneyStolen.toLocaleString()} money.`
+    ? `${attacker.name} overpowered ${defender.name} (${Math.round(effective)} vs ${defPower}). ${landText} ${moneyStolen.toLocaleString()} money.`
     : `${defender.name} repelled ${attacker.name}'s attack (${Math.round(effective)} vs ${defPower}).`;
 
   return {
@@ -197,13 +202,19 @@ export function resolveInstant(
 
 // ── DB write after resolution ──────────────────────────────────────────────
 
+export interface PersistedBattle {
+  battleId:            string;
+  /** Set when the defender was knocked down to the land floor and got a ruin shield. */
+  defenderShieldUntil: Date | null;
+}
+
 export async function persistBattleResult(
   attackerNationId: string,
   defenderNationId: string,
   result: BattleResult,
   turnsCost: number,
-): Promise<string> {
-  const battle = await prisma.$transaction(async (tx) => {
+): Promise<PersistedBattle> {
+  return prisma.$transaction(async (tx) => {
     // 1. Create battle record
     const b = await tx.battle.create({
       data: {
@@ -261,8 +272,18 @@ export async function persistBattleResult(
       },
     });
 
-    return b;
-  });
+    // 6. Ruin shield — a beaten enclave at the land floor gets time to recover
+    let defenderShieldUntil: Date | null = null;
+    if (result.winner === "ATTACKER") {
+      const def = await tx.resource.findUniqueOrThrow({
+        where:  { nationId: defenderNationId },
+        select: { land: true },
+      });
+      if (def.land <= COMBAT.LAND_FLOOR) {
+        defenderShieldUntil = await grantRuinShield(tx, defenderNationId);
+      }
+    }
 
-  return battle.id;
+    return { battleId: b.id, defenderShieldUntil };
+  });
 }

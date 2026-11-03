@@ -25,6 +25,9 @@ export function SettingsContent({
   const router = useRouter();
   const [newName,  setNewName]  = useState(nationName);
   const [busy,     setBusy]     = useState(false);
+  const [abandoning,   setAbandoning]   = useState(false);
+  const [confirmName,  setConfirmName]  = useState("");
+  const [abandonBusy,  setAbandonBusy]  = useState(false);
 
   const trimmed   = newName.trim();
   const canRename = nameChangesLeft > 0 && trimmed.length >= 2 && trimmed !== nationName && !busy;
@@ -42,6 +45,22 @@ export function SettingsContent({
     if (!res.ok) { toast.error(data.error ?? "Rename failed"); return; }
     toast.success(`Enclave renamed to ${trimmed}`);
     router.refresh();
+  }
+
+  const canAbandon = confirmName.trim().toLowerCase() === nationName.toLowerCase() && !abandonBusy;
+
+  async function abandonEnclave() {
+    if (!canAbandon) return;
+    setAbandonBusy(true);
+    const res = await fetch("/api/game/settings/abandon", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "x-idempotency-key": crypto.randomUUID() },
+      body:    JSON.stringify({ confirmName: confirmName.trim() }),
+    });
+    const data = await res.json() as { error?: string };
+    if (!res.ok) { setAbandonBusy(false); toast.error(data.error ?? "Could not abandon enclave"); return; }
+    toast.success(`${nationName} has been abandoned`);
+    router.push("/setup");
   }
 
   return (
@@ -125,13 +144,62 @@ export function SettingsContent({
         <CardHeader className="pb-3">
           <CardTitle className="text-red-400 text-sm">Account Actions</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full h-8 text-sm font-semibold rounded border border-red-900 text-red-400 hover:bg-red-950/50 transition-colors"
           >
             Sign Out
           </button>
+
+          <Separator className="bg-slate-800" />
+
+          {!abandoning ? (
+            <div className="space-y-1.5">
+              <button
+                onClick={() => setAbandoning(true)}
+                className="w-full h-8 text-sm font-semibold rounded bg-red-950/60 border border-red-800 text-red-300 hover:bg-red-900/60 transition-colors"
+              >
+                Abandon Enclave
+              </button>
+              <p className="text-xs text-slate-500">
+                Give up {nationName} and found a new enclave from scratch.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 rounded border border-red-800/60 bg-red-950/20 p-3">
+              <p className="text-sm text-red-300 font-semibold">
+                ⚠️ This permanently ends {nationName}.
+              </p>
+              <p className="text-xs text-slate-400">
+                All land, money, buildings and units are lost. You will start a new enclave from the beginning.
+                Type <span className="font-mono text-slate-200">{nationName}</span> to confirm.
+              </p>
+              <Input
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={nationName}
+                maxLength={32}
+                className="bg-slate-800 border-slate-700 text-slate-100 h-8 text-sm"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={abandonEnclave}
+                  disabled={!canAbandon}
+                  className="flex-1 h-8 text-sm font-semibold rounded bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors"
+                >
+                  {abandonBusy ? "Abandoning…" : "Abandon forever"}
+                </button>
+                <button
+                  onClick={() => { setAbandoning(false); setConfirmName(""); }}
+                  disabled={abandonBusy}
+                  className="px-4 h-8 text-sm font-semibold rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

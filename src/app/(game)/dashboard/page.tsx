@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { calcNetworth } from "@/lib/networth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns, minutesToNextTurn } from "@/server/game-engine/turns";
@@ -42,7 +43,7 @@ export default async function DashboardPage() {
       resources={{
         money:  nation.resource?.money  ?? 0,
         land:   nation.resource?.land   ?? 0,
-        power:  nation.totalUnits * 10 + (nation.resource?.land ?? 0) * 5,
+        power:  calcNetworth({ totalUnits: nation.totalUnits, land: nation.resource?.land ?? 0 }),
         energy: nation.resource?.energy ?? 0,
       }}
     />

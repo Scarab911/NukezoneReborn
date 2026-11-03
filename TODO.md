@@ -19,7 +19,8 @@ Last updated: 2026-11-03
 | Buildings | Multiplier-only, consume land | Upgrade path without map complexity |
 | Player identity | Enclave name only (no player/display name) | One world, one enclave per player |
 | Terminology | "Enclave" in UI; `Nation` stays in code/DB | Post-apocalyptic fit without a risky rename |
-| Destruction | Player restarts from scratch with a new name | Old record kept for history (`formerPlayerId`) |
+| Destruction | Combat ruins, never destroys: land floor 100 + 24h ruin shield. Restart only via "Abandon enclave" | Keeps beaten players in the game; old record kept (`formerPlayerId`) |
+| Attack range | Networth 50%–200% of yours, mutual (`src/lib/networth.ts`) | Big can't farm small; beaten players drop out of big players' range |
 | Renames | Once per enclave → once per round later; VIPs get extra | Stored as `Nation.nameChangesLeft` |
 
 ---
@@ -77,8 +78,14 @@ Last updated: 2026-11-03
 
 ### Enclave Identity (follow-ups)
 - [ ] Verify in running app: register → setup → rename once → second rename blocked
-- [ ] Destruction mechanic: set `status = DESTROYED` (combat/nukes); the restart flow is already wired to it
-- [ ] On destruction: remove from alliance; hide destroyed enclaves from rankings, military targets, message recipients
+- [x] Networth attack range 50%–200%, checked server-side; military page shows range, greys out-of-range targets
+- [x] Ruin instead of destruction: land floor 100, 24h ruin shield, `Nation.protectedUntil`
+- [x] Abandon enclave (Settings) → DESTROYED → `/setup`; leaves alliance (leader handed over / alliance disbanded)
+- [ ] Verify in running app with 2–3 accounts: out-of-range attack blocked; land stops at 100; ruin shield blocks attackers; attacking ends own shield; abandon → setup → new enclave
+- [ ] Battles don't actually remove lost units (`attackerLost`/`defenderLost` only recorded) — so networth never drops from battle losses
+- [ ] Buildings vs. land: losing land doesn't remove buildings — decide what happens when buildings exceed land
+- [ ] Watch for shield farming (staying at 100 land to be shielded after each loss); add a cooldown if needed
+- [ ] Hide destroyed enclaves from message recipients
 - [ ] Block all mutating API routes for destroyed enclaves (only explore + attack check today)
 - [ ] Decide: drop unused `Player.name` / `UserProfile` (no longer written on register)
 - [ ] Future: reset `nameChangesLeft` per round/season; extra renames for VIP subscribers

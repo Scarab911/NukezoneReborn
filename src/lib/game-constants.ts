@@ -63,6 +63,14 @@ export const COMBAT = {
   ATTACKER_LOSS_PCT_DEFEAT: 0.20,
   DEFENDER_LOSS_PCT_DEFEAT: 0.05,
 
+  // Attack range: targets must have networth within [my × RATIO, my ÷ RATIO].
+  // A single ratio keeps the range mutual — if A can reach B, B can reach A.
+  RANGE_RATIO:       0.5,
+  // Attacks can't take land below this (= starting land): enclaves get ruined, never wiped out
+  LAND_FLOOR:        100,
+  // Shield granted when an enclave is knocked down to LAND_FLOOR
+  RUIN_SHIELD_HOURS: 24,
+
   // Strategic weapons — flat damage to defense power
   NUKE_DAMAGE:    500,
   CHEM_DAMAGE:    200,

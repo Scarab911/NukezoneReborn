@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns } from "@/server/game-engine/turns";
-import { ECONOMY } from "@/lib/game-constants";
+import { calcNetworth, attackRange } from "@/lib/networth";
 import { MilitaryContent } from "./MilitaryContent";
 
 export default async function MilitaryPage() {
@@ -38,9 +38,9 @@ export default async function MilitaryPage() {
     take:    100,
   });
 
-  const myPower = me.totalUnits * 10 + (me.resource?.land ?? 0) * 5;
+  const myPower = calcNetworth({ totalUnits: me.totalUnits, land: me.resource?.land ?? 0 });
   const protectionExpiresAt = me.status === "PROTECTED"
-    ? new Date(me.createdAt.getTime() + ECONOMY.PROTECTION_HOURS * 3_600_000).toISOString()
+    ? me.protectedUntil?.toISOString() ?? null
     : null;
 
   const totalUnits: Record<string, number> = {};
@@ -54,6 +54,7 @@ export default async function MilitaryPage() {
     <MilitaryContent
       myNationId={me.id}
       myPower={myPower}
+      myRange={attackRange(myPower)}
       myTotalUnits={me.totalUnits}
       myStatus={me.status}
       protectionExpiresAt={protectionExpiresAt}
@@ -64,7 +65,7 @@ export default async function MilitaryPage() {
         name:   t.name,
         color:  t.color,
         land:   t.resource?.land ?? 0,
-        power:  t.totalUnits * 10 + (t.resource?.land ?? 0) * 5,
+        power:  calcNetworth({ totalUnits: t.totalUnits, land: t.resource?.land ?? 0 }),
         status: t.status,
       }))}
     />

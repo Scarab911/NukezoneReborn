@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Nation, Resource, MoraleRecord, Prisma } from "@prisma/client";
 import { ECONOMY, ENCLAVE, TURNS } from "@/lib/game-constants";
+import { newPlayerProtectionUntil } from "@/server/services/protection.service";
 
 const WORLD_ID = "world_01";
 
@@ -67,8 +68,9 @@ export async function foundEnclave(playerId: string, name: string): Promise<Foun
         playerId,
         name,
         color:        randomEnclaveColor(),
-        status:       "PROTECTED",
-        turns:        TURNS.STARTING_TURNS,
+        status:         "PROTECTED",
+        protectedUntil: newPlayerProtectionUntil(),
+        turns:       TURNS.STARTING_TURNS,
         maxTurns:     TURNS.MAX_TURNS,
         turnsRegenAt: new Date(),
       },
@@ -112,6 +114,58 @@ export async function renameEnclave(playerId: string, name: string): Promise<Ren
     });
     if (count === 0) return { ok: false, error: "NO_RENAMES_LEFT" } as const;
 
+    return { ok: true } as const;
+  });
+}
+
+/**
+ * Removes an enclave from its alliance. A departing leader hands over to the
+ * longest-serving remaining member; an alliance left with no members is disbanded.
+ */
+async function leaveAlliance(tx: Prisma.TransactionClient, nationId: string): Promise<void> {
+  const membership = await tx.allianceMember.findUnique({ where: { nationId } });
+  if (!membership) return;
+
+  await tx.allianceMember.delete({ where: { id: membership.id } });
+
+  const successor = await tx.allianceMember.findFirst({
+    where:   { allianceId: membership.allianceId },
+    orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
+  });
+  if (!successor) {
+    await tx.alliance.update({ where: { id: membership.allianceId }, data: { status: "DISBANDED" } });
+    return;
+  }
+  if (membership.role === "LEADER") {
+    await tx.allianceMember.update({ where: { id: successor.id }, data: { role: "LEADER" } });
+  }
+}
+
+export type AbandonEnclaveResult =
+  | { ok: true }
+  | { ok: false; error: "NO_ENCLAVE" | "NAME_MISMATCH" };
+
+/**
+ * The player gives up their enclave to start over. It is marked DESTROYED and
+ * removed from its alliance; the game layout then sends the player to /setup.
+ * `confirmName` must match the enclave name (case-insensitive) as a safety check.
+ */
+export async function abandonEnclave(playerId: string, confirmName: string): Promise<AbandonEnclaveResult> {
+  return prisma.$transaction(async (tx) => {
+    const nation = await tx.nation.findUnique({
+      where:  { playerId },
+      select: { id: true, name: true, status: true },
+    });
+    if (!nation || nation.status === "DESTROYED") return { ok: false, error: "NO_ENCLAVE" } as const;
+    if (nation.name.toLowerCase() !== confirmName.trim().toLowerCase()) {
+      return { ok: false, error: "NAME_MISMATCH" } as const;
+    }
+
+    await leaveAlliance(tx, nation.id);
+    await tx.nation.update({
+      where: { id: nation.id },
+      data:  { status: "DESTROYED", protectedUntil: null },
+    });
     return { ok: true } as const;
   });
 }

@@ -5,6 +5,16 @@ Format: `## [version or date] — Description`
 
 ---
 
+## [2026-11-03] — Attack Range + Ruin Instead of Destruction
+
+- **Added**: `src/lib/networth.ts` — shared networth formula (`units × 10 + land × 5`) and mutual 50%–200% attack range
+- **Added**: server-side range check on `POST /api/military/attack` (403 when out of range)
+- **Changed**: attacks can't take land below 100; an enclave knocked to 100 gets a 24h ruin shield
+- **Changed**: protection now stored in `Nation.protectedUntil` (was computed from `createdAt`); logic in `protection.service.ts`
+- **Added**: military page shows "Your range", greys out-of-range targets, defaults to "In range" filter
+- **Added**: "Abandon enclave" in Settings (`POST /api/game/settings/abandon`) — leaves alliance, sets DESTROYED, restarts via `/setup`
+- **DB migration** (Supabase MCP): `Nation.protectedUntil` added; backfilled `createdAt + 72h` for PROTECTED rows
+
 ## [2026-11-03] — Enclave Identity
 
 - **Changed**: "nation" → "enclave" in all player-facing text (code/DB names unchanged)

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { calcNetworth } from "@/lib/networth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { RankingsContent } from "./RankingsContent";
@@ -35,7 +36,7 @@ export default async function RankingsPage() {
       land:       n.resource?.land  ?? 0,
       battles:    n._count.attackingBattles,
       isOwn:      n.id === myNation?.id,
-      score:      n.totalUnits * 10 + (n.resource?.land ?? 0) * 5 + n._count.attackingBattles * 50,
+      score:      calcNetworth({ totalUnits: n.totalUnits, land: n.resource?.land ?? 0 }) + n._count.attackingBattles * 50,
     }))
     .sort((a, b) => b.score - a.score)
     .map((n, i) => ({ ...n, rank: i + 1 }));

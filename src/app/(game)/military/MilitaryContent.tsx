@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { rangeStatus, landTakenOnWin, type RangeStatus } from "@/lib/networth";
 
 interface Target {
   id:     string;
@@ -17,6 +18,7 @@ interface Target {
 interface Props {
   myNationId:          string;
   myPower:             number;
+  myRange:             { min: number; max: number };
   myTotalUnits:        number;
   myStatus:            string;
   protectionExpiresAt: string | null;
@@ -33,15 +35,22 @@ interface BattleResult {
   attackerLost:          number;
   defenderLost:          number;
   attackerLostProtection?: boolean;
+  defenderShielded?:     boolean;
 }
 
 type SortKey = "power" | "land" | "name";
-type FilterKey = "all" | "weaker" | "stronger";
+type FilterKey = "inRange" | "all" | "weaker" | "stronger";
 
 const FILTER_LABEL: Record<FilterKey, string> = {
+  inRange:  "In range",
   all:      "All",
   weaker:   "Weaker",
   stronger: "Stronger",
+};
+
+const OUT_OF_RANGE_LABEL: Record<Exclude<RangeStatus, "IN_RANGE">, string> = {
+  TOO_WEAK:   "Too weak",
+  TOO_STRONG: "Too strong",
 };
 
 function powerLabel(ratio: number): { label: string; color: string } {
@@ -52,7 +61,7 @@ function powerLabel(ratio: number): { label: string; color: string } {
 }
 
 export function MilitaryContent({
-  myPower, myStatus, protectionExpiresAt, turns, totalUnits, targets,
+  myPower, myRange, myStatus, protectionExpiresAt, turns, totalUnits, targets,
 }: Props) {
   const router = useRouter();
 
@@ -62,7 +71,7 @@ export function MilitaryContent({
   const [lastResult,  setLastResult]  = useState<BattleResult | null>(null);
   const [search,      setSearch]      = useState("");
   const [sort,        setSort]        = useState<SortKey>("power");
-  const [filter,      setFilter]      = useState<FilterKey>("all");
+  const [filter,      setFilter]      = useState<FilterKey>("inRange");
 
   const isProtected = myStatus === "PROTECTED";
 
@@ -72,6 +81,7 @@ export function MilitaryContent({
   const processed = useMemo(() => {
     let list = targets.filter((t) => {
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filter === "inRange"  && rangeStatus(myPower, t.power) !== "IN_RANGE") return false;
       if (filter === "weaker"   && t.power >= myPower) return false;
       if (filter === "stronger" && t.power <  myPower) return false;
       return true;
@@ -87,9 +97,11 @@ export function MilitaryContent({
   }, [targets, search, sort, filter, myPower]);
 
   const selectedTarget = targets.find((t) => t.id === selected) ?? null;
+  const selectedRange  = selectedTarget ? rangeStatus(myPower, selectedTarget.power) : null;
+  const selectedInRange = selectedRange === "IN_RANGE";
 
   function requestAttack() {
-    if (!selected || !canAttack) return;
+    if (!selected || !canAttack || !selectedInRange) return;
     setConfirming(true);
   }
 
@@ -123,6 +135,9 @@ export function MilitaryContent({
       if (data.attackerLostProtection) {
         toast.warning("Your protection has been lifted. You are now vulnerable.");
       }
+      if (data.defenderShielded) {
+        toast.info("The enemy enclave is in ruins and is now shielded while it recovers.");
+      }
       setLastResult(data);
       setSelected(null);
       if (data.winner === "ATTACKER") {
@@ -145,6 +160,10 @@ export function MilitaryContent({
         <h1 className="text-2xl font-bold text-slate-100">Military</h1>
         <p className="text-slate-500 text-sm mt-0.5">
           ⚡ {turns} turns — 1 per attack · Your power: <span className="text-orange-400 font-mono">{myPower.toLocaleString()}</span>
+        </p>
+        <p className="text-slate-500 text-sm mt-0.5">
+          🎯 Your range: <span className="text-slate-300 font-mono">{myRange.min.toLocaleString()} – {myRange.max.toLocaleString()}</span> power
+          <span className="text-slate-600"> · you can only attack, and be attacked by, enclaves in this range</span>
         </p>
         {isProtected && protectionExpiresAt && (
           <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-950/40 border border-blue-800/50 text-xs text-blue-300">
@@ -251,7 +270,9 @@ export function MilitaryContent({
         {processed.map((t) => {
           const ratio = myPower > 0 ? t.power / myPower : 1;
           const { label: diffLabel, color: diffColor } = powerLabel(ratio);
-          const potentialLand = Math.max(1, Math.floor(t.land * 0.05));
+          const potentialLand = landTakenOnWin(t.land);
+          const range = rangeStatus(myPower, t.power);
+          const inRange = range === "IN_RANGE";
 
           return (
             <button
@@ -261,7 +282,7 @@ export function MilitaryContent({
                 selected === t.id
                   ? "border-red-700 bg-red-950/30"
                   : "border-slate-800 bg-slate-900 hover:border-slate-700"
-              }`}
+              } ${inRange ? "" : "opacity-50"}`}
             >
               {/* Row 1 — name + badges */}
               <div className="flex items-center justify-between mb-1.5">
@@ -272,14 +293,20 @@ export function MilitaryContent({
                     <Badge variant="outline" className="text-[10px] border-blue-800 text-blue-400 shrink-0">Protected</Badge>
                   )}
                 </div>
-                <span className={`text-xs font-semibold shrink-0 ml-2 ${diffColor}`}>{diffLabel}</span>
+                {inRange ? (
+                  <span className={`text-xs font-semibold shrink-0 ml-2 ${diffColor}`}>{diffLabel}</span>
+                ) : (
+                  <span className="text-xs font-semibold shrink-0 ml-2 text-slate-500">{OUT_OF_RANGE_LABEL[range]}</span>
+                )}
               </div>
 
               {/* Row 2 — stats */}
               <div className="flex gap-4 text-xs font-mono text-slate-400">
                 <span>🌍 <span className="text-green-400">{t.land.toLocaleString()}</span> land</span>
                 <span>📊 <span className="text-orange-400">{t.power.toLocaleString()}</span> power</span>
-                <span className="text-slate-600 ml-auto">+~{potentialLand} land on win</span>
+                <span className="text-slate-600 ml-auto">
+                  {potentialLand > 0 ? `+~${potentialLand} land on win` : "No land to take"}
+                </span>
               </div>
             </button>
           );
@@ -302,9 +329,14 @@ export function MilitaryContent({
                 </p>
                 <p className="text-slate-500 text-xs mt-0.5">
                   Power {selectedTarget.power.toLocaleString()} · 🌍 {selectedTarget.land.toLocaleString()} land ·{" "}
-                  +~{Math.max(1, Math.floor(selectedTarget.land * 0.05))} land on win · Costs 1 turn
+                  +~{landTakenOnWin(selectedTarget.land)} land on win · Costs 1 turn
                 </p>
-                {!canAttack && (
+                {selectedRange && selectedRange !== "IN_RANGE" && (
+                  <p className="text-red-400 text-xs mt-0.5">
+                    Out of range — {selectedRange === "TOO_WEAK" ? "too weak" : "too strong"} for you to attack
+                  </p>
+                )}
+                {selectedInRange && !canAttack && (
                   <p className="text-red-400 text-xs mt-0.5">
                     {turns === 0 ? "No turns left" : "No units — train first"}
                   </p>
@@ -312,7 +344,7 @@ export function MilitaryContent({
               </div>
               <button
                 onClick={requestAttack}
-                disabled={busy || !canAttack}
+                disabled={busy || !canAttack || !selectedInRange}
                 className="shrink-0 px-6 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-sm rounded-lg disabled:opacity-40 transition-colors"
               >
                 ⚔️ Attack
@@ -332,8 +364,8 @@ export function MilitaryContent({
               )}
               <p className="text-slate-400 text-xs">
                 {isProtected
-                  ? `Protection expires ${new Date(protectionExpiresAt!).toLocaleString()}. Once removed it cannot be restored.`
-                  : `Costs 1 turn · Resolves instantly · Potential gain: +~${Math.max(1, Math.floor(selectedTarget.land * 0.05))} land`}
+                  ? `Protection expires ${protectionExpiresAt ? new Date(protectionExpiresAt).toLocaleString() : "soon"}. Once removed it cannot be restored.`
+                  : `Costs 1 turn · Resolves instantly · Potential gain: +~${landTakenOnWin(selectedTarget.land)} land`}
               </p>
               <div className="flex gap-2">
                 <button
