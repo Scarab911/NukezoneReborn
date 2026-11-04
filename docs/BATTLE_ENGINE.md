@@ -28,7 +28,7 @@
 | Attacking while shielded | Allowed with `acknowledgeProtectionLoss: true`; ends the shield | attack route |
 | Destruction | Only by player choice ("Abandon enclave") → DESTROYED → `/setup` | `abandonEnclave` in `nation.service.ts` |
 
-Known gap: unit losses (`attackerLost` / `defenderLost`) are recorded in the report but not yet removed from armies.
+| Casualties | Win: attacker −10%, defender −30% · Loss: attacker −20%, defender −5% (rounded up) | `distributeLosses` splits each side's loss across unit types in proportion to stack size; `Nation.totalUnits` is reset to the real remaining count |
 
 ---
 

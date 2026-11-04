@@ -4,6 +4,23 @@
 
 ---
 
+## Session: 2026-11-04 — In-App Test + Battle Casualties
+
+### What Was Done
+- **Tested in the running app** with 3 accounts (logins in a local scratchpad file, not in the repo): register/setup/rename, attack range (UI + API), land floor, ruin shield, attacking ends own shield, abandon → alliance handover → setup → reuse old name. All pass
+- **Fixed** missing "In range" filter button on the military page (`1a9165e`)
+- **Battle casualties**: `applyCasualties` in `combat.ts` removes losses inside the battle transaction, re-reading stacks so concurrent battles can't go negative; `distributeLosses` splits proportionally (largest remainder). `Nation.totalUnits` is set from the real remaining count, which also repairs drifted counters. Transaction timeout raised to 15s
+- Verified live: 70 Spear + 30 Ranger losing 10 → 63 + 27; defender 10 → 7 (its stale `totalUnits` of 300 corrected to 7)
+
+### Test Data (kept on purpose)
+- Enclaves `QA Alpha Prime`, `QA Bravo`, `QA Charlie`; alliance `QA Pact` (Charlie leads). Their stats were set by SQL for testing; they're not natural game states
+
+### Notes
+- Stopping the dev server via the background task can leave `next start-server` alive on port 3000 — kill the node process tree if a restart fails with 500s
+- Not tested yet: lazy expiry of the 72h new-player shield
+
+---
+
 ## Session: 2026-11-03 (later) — Attack Range + Ruin Shield
 
 ### What Was Done

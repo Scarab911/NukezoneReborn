@@ -2,7 +2,7 @@ import { COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
 import { landTakenOnWin } from "@/lib/networth";
 import { grantRuinShield } from "@/server/services/protection.service";
-import type { Resource, MoraleRecord, UnitType, Building } from "@prisma/client";
+import type { Resource, MoraleRecord, UnitType, Building, Prisma } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -200,6 +200,59 @@ export function resolveInstant(
   };
 }
 
+// ── Casualties ─────────────────────────────────────────────────────────────
+
+/**
+ * Splits `lost` units across unit stacks in proportion to their size
+ * (largest-remainder method), never taking more than a stack holds.
+ * Returns stack id → units lost.
+ */
+export function distributeLosses(
+  stacks: Array<{ id: string; quantity: number }>,
+  lost: number,
+): Map<string, number> {
+  const result = new Map<string, number>();
+  const total  = stacks.reduce((s, u) => s + u.quantity, 0);
+  const toLose = Math.min(Math.max(0, lost), total);
+  if (toLose === 0) return result;
+
+  const shares = stacks.map((u) => {
+    const exact = (u.quantity * toLose) / total;
+    return { id: u.id, quantity: u.quantity, loss: Math.floor(exact), frac: exact - Math.floor(exact) };
+  });
+  let remaining = toLose - shares.reduce((s, x) => s + x.loss, 0);
+  for (const x of [...shares].sort((a, b) => b.frac - a.frac || b.quantity - a.quantity)) {
+    if (remaining === 0) break;
+    if (x.loss < x.quantity) { x.loss += 1; remaining -= 1; }
+  }
+  for (const x of shares) if (x.loss > 0) result.set(x.id, x.loss);
+  return result;
+}
+
+/**
+ * Removes battle casualties from a nation's armies and re-syncs Nation.totalUnits
+ * from what is actually left. Reads stacks inside the transaction so a concurrent
+ * battle can never push a quantity below zero.
+ */
+async function applyCasualties(
+  tx: Prisma.TransactionClient,
+  nationId: string,
+  lost: number,
+): Promise<void> {
+  const stacks = await tx.unit.findMany({
+    where:  { army: { nationId }, quantity: { gt: 0 } },
+    select: { id: true, quantity: true },
+  });
+
+  const losses = distributeLosses(stacks, lost);
+  for (const [id, loss] of losses) {
+    await tx.unit.update({ where: { id }, data: { quantity: { decrement: loss } } });
+  }
+
+  const remaining = stacks.reduce((s, u) => s + u.quantity - (losses.get(u.id) ?? 0), 0);
+  await tx.nation.update({ where: { id: nationId }, data: { totalUnits: remaining } });
+}
+
 // ── DB write after resolution ──────────────────────────────────────────────
 
 export interface PersistedBattle {
@@ -254,7 +307,11 @@ export async function persistBattleResult(
       });
     }
 
-    // 4. Apply morale changes
+    // 4. Casualties
+    await applyCasualties(tx, attackerNationId, result.attackerLost);
+    await applyCasualties(tx, defenderNationId, result.defenderLost);
+
+    // 5. Apply morale changes
     await tx.moraleRecord.update({
       where: { nationId: attackerNationId },
       data:  { morale: { increment: result.attackerMoraleDelta } },
@@ -264,7 +321,7 @@ export async function persistBattleResult(
       data:  { morale: { increment: result.defenderMoraleDelta } },
     });
 
-    // 5. Store report
+    // 6. Store report
     await tx.battleReport.create({
       data: {
         battleId: b.id,
@@ -272,7 +329,7 @@ export async function persistBattleResult(
       },
     });
 
-    // 6. Ruin shield — a beaten enclave at the land floor gets time to recover
+    // 7. Ruin shield — a beaten enclave at the land floor gets time to recover
     let defenderShieldUntil: Date | null = null;
     if (result.winner === "ATTACKER") {
       const def = await tx.resource.findUniqueOrThrow({
@@ -285,5 +342,5 @@ export async function persistBattleResult(
     }
 
     return { battleId: b.id, defenderShieldUntil };
-  });
+  }, { timeout: 15_000 });  // several round-trips to a remote DB — default 5s is tight
 }

@@ -5,6 +5,14 @@ Format: `## [version or date] — Description`
 
 ---
 
+## [2026-11-04] — Battle Casualties
+
+- **Fixed**: battles now remove lost units from armies (previously only recorded in the report)
+- **Changed**: losses split proportionally across unit types (`distributeLosses` in `combat.ts`); `Nation.totalUnits` re-synced from real armies after each battle
+- **Fixed**: military page "In range" filter button was missing
+- **Removed**: unused `decrementUnits` from `nation.service.ts`
+- Verified in the running app with 3 test accounts (range, land floor, ruin shield, abandon, casualties)
+
 ## [2026-11-03] — Attack Range + Ruin Instead of Destruction
 
 - **Added**: `src/lib/networth.ts` — shared networth formula (`units × 10 + land × 5`) and mutual 50%–200% attack range

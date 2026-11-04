@@ -84,7 +84,8 @@ Last updated: 2026-11-03
 - [x] Verify in running app with 3 accounts: range (UI + API), land floor, ruin shield, attacking ends own shield, abandon → alliance handover → setup → new enclave (2026-11-04)
 - [ ] Setup screen says "was destroyed" after a voluntary abandon — reword
 - [ ] Hydration warning: header money formatted with server locale ("5 000") vs browser ("5,000") — use a fixed locale
-- [ ] Battles don't actually remove lost units (`attackerLost`/`defenderLost` only recorded) — so networth never drops from battle losses
+- [x] Battles remove lost units — split proportionally across unit types; `Nation.totalUnits` re-synced from real armies (2026-11-04)
+- [ ] Test lazy expiry of the 72h new-player shield (set `protectedUntil` in the past, then attack)
 - [ ] Buildings vs. land: losing land doesn't remove buildings — decide what happens when buildings exceed land
 - [ ] Watch for shield farming (staying at 100 land to be shielded after each loss); add a cooldown if needed
 - [ ] Hide destroyed enclaves from message recipients
