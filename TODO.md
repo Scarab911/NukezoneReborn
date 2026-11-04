@@ -86,7 +86,8 @@ Last updated: 2026-11-03
 - [ ] Hydration warning: header money formatted with server locale ("5 000") vs browser ("5,000") — use a fixed locale
 - [x] Battles remove lost units — split proportionally across unit types; `Nation.totalUnits` re-synced from real armies (2026-11-04)
 - [ ] Test lazy expiry of the 72h new-player shield (set `protectedUntil` in the past, then attack)
-- [ ] Buildings vs. land: losing land doesn't remove buildings — decide what happens when buildings exceed land
+- [x] Attacks raze buildings: land taken comes from free and built land proportionally; razed buildings free their land for the attacker (2026-11-04)
+- [ ] Dashboard/settings "Land" still shows free land only — consider showing total (free + built)
 - [ ] Watch for shield farming (staying at 100 land to be shielded after each loss); add a cooldown if needed
 - [ ] Hide destroyed enclaves from message recipients
 - [ ] Block all mutating API routes for destroyed enclaves (only explore + attack check today)

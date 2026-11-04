@@ -31,6 +31,7 @@ interface BattleResult {
   winner:                string;
   summary:               string;
   landGained:            number;
+  buildingsDestroyed?:   number;
   moneyStolen:           number;
   attackerLost:          number;
   defenderLost:          number;
@@ -205,6 +206,9 @@ export function MilitaryContent({
           {lastResult.winner === "ATTACKER" && (
             <div className="flex gap-4 mt-2 text-xs font-mono">
               {lastResult.landGained  > 0 && <span className="text-green-400">+{lastResult.landGained} land</span>}
+              {(lastResult.buildingsDestroyed ?? 0) > 0 && (
+                <span className="text-orange-400">🏚️ {lastResult.buildingsDestroyed} enemy buildings razed</span>
+              )}
               {lastResult.moneyStolen > 0 && <span className="text-yellow-400">+{lastResult.moneyStolen.toLocaleString()} 💰</span>}
             </div>
           )}

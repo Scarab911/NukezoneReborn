@@ -1,6 +1,6 @@
 import { COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
-import { landTakenOnWin } from "@/lib/networth";
+import { planLandSeizure, totalLand } from "@/lib/networth";
 import { grantRuinShield } from "@/server/services/protection.service";
 import type { Resource, MoraleRecord, UnitType, Building, Prisma } from "@prisma/client";
 
@@ -24,7 +24,10 @@ export interface BattleResult {
   variance:          number;
   attackerLost:      number;
   defenderLost:      number;
+  /** Filled in by persistBattleResult (computed from fresh data inside the transaction). */
   landGained:        number;
+  /** Filled in by persistBattleResult. */
+  buildingsDestroyed: number;
   moneyStolen:       number;
   attackerMoraleDelta: number;
   defenderMoraleDelta: number;
@@ -163,7 +166,6 @@ export function resolveInstant(
   const atkTotal     = totalUnits(attacker);
   const defTotal     = totalUnits(defender);
 
-  let landGained   = 0;
   let moneyStolen  = 0;
   let atkLost      = 0;
   let defLost      = 0;
@@ -173,7 +175,6 @@ export function resolveInstant(
   if (attackerWins) {
     atkLost     = Math.ceil(atkTotal * COMBAT.ATTACKER_LOSS_PCT);
     defLost     = Math.ceil(defTotal * COMBAT.DEFENDER_LOSS_PCT);
-    landGained  = landTakenOnWin(defender.resource?.land ?? 0);
     moneyStolen = Math.floor((defender.resource?.money ?? 0) * COMBAT.MONEY_STEAL_PCT);
     atkMorale   = MORALE.WIN_ATTACK;
     defMorale   = MORALE.LOSE_ATTACK;
@@ -185,19 +186,26 @@ export function resolveInstant(
   }
 
   const winner = attackerWins ? "ATTACKER" : "DEFENDER";
-  const landText = landGained > 0
-    ? `Seized ${landGained} land and`
-    : `${defender.name} has no land left to take. Seized`;
+  // Headline only — persistBattleResult appends the loot once land is settled
   const summary = attackerWins
-    ? `${attacker.name} overpowered ${defender.name} (${Math.round(effective)} vs ${defPower}). ${landText} ${moneyStolen.toLocaleString()} money.`
+    ? `${attacker.name} overpowered ${defender.name} (${Math.round(effective)} vs ${defPower}).`
     : `${defender.name} repelled ${attacker.name}'s attack (${Math.round(effective)} vs ${defPower}).`;
 
   return {
     winner, attackerPower: atkPower, defenderPower: defPower,
     variance, attackerLost: atkLost, defenderLost: defLost,
-    landGained, moneyStolen, attackerMoraleDelta: atkMorale,
+    landGained: 0, buildingsDestroyed: 0, moneyStolen, attackerMoraleDelta: atkMorale,
     defenderMoraleDelta: defMorale, seed, summary,
   };
+}
+
+function lootText(defenderName: string, landGained: number, buildingsDestroyed: number, moneyStolen: number): string {
+  const money = `${moneyStolen.toLocaleString("en-US")} money`;
+  if (landGained === 0) return `${defenderName} has no land left to take. Seized ${money}.`;
+  const razed = buildingsDestroyed > 0
+    ? ` (razed ${buildingsDestroyed} building${buildingsDestroyed === 1 ? "" : "s"})`
+    : "";
+  return `Seized ${landGained} land${razed} and ${money}.`;
 }
 
 // ── Casualties ─────────────────────────────────────────────────────────────
@@ -230,6 +238,53 @@ export function distributeLosses(
 }
 
 /**
+ * Moves land from defender to attacker, razing defender buildings so built land
+ * can be claimed. Building losses are spread across types in proportion to count.
+ * Returns what was taken and the defender's total land afterwards.
+ */
+async function seizeLand(
+  tx: Prisma.TransactionClient,
+  attackerNationId: string,
+  defenderNationId: string,
+): Promise<{ landTaken: number; buildingsDestroyed: number; defenderTotalAfter: number }> {
+  const res       = await tx.resource.findUniqueOrThrow({ where: { nationId: defenderNationId }, select: { land: true } });
+  const buildings = await tx.building.findMany({
+    where:  { nationId: defenderNationId, count: { gt: 0 } },
+    select: { id: true, count: true },
+  });
+  const buildingCount = buildings.reduce((s, b) => s + b.count, 0);
+  const plan = planLandSeizure(res.land, buildingCount);
+
+  if (plan.buildingsDestroyed > 0) {
+    const razed = distributeLosses(
+      buildings.map((b) => ({ id: b.id, quantity: b.count })),
+      plan.buildingsDestroyed,
+    );
+    for (const [id, n] of razed) {
+      await tx.building.update({ where: { id }, data: { count: { decrement: n } } });
+    }
+  }
+  if (plan.defenderFreeDelta !== 0) {
+    await tx.resource.update({
+      where: { nationId: defenderNationId },
+      data:  { land: { increment: plan.defenderFreeDelta } },
+    });
+  }
+  if (plan.landTaken > 0) {
+    await tx.resource.update({
+      where: { nationId: attackerNationId },
+      data:  { land: { increment: plan.landTaken } },
+    });
+  }
+
+  return {
+    landTaken:          plan.landTaken,
+    buildingsDestroyed: plan.buildingsDestroyed,
+    defenderTotalAfter: totalLand(res.land + plan.defenderFreeDelta, buildingCount - plan.buildingsDestroyed),
+  };
+}
+
+/**
  * Removes battle casualties from a nation's armies and re-syncs Nation.totalUnits
  * from what is actually left. Reads stacks inside the transaction so a concurrent
  * battle can never push a quantity below zero.
@@ -257,6 +312,10 @@ async function applyCasualties(
 
 export interface PersistedBattle {
   battleId:            string;
+  landGained:          number;
+  buildingsDestroyed:  number;
+  /** Full summary including loot. */
+  summary:             string;
   /** Set when the defender was knocked down to the land floor and got a ruin shield. */
   defenderShieldUntil: Date | null;
 }
@@ -264,26 +323,41 @@ export interface PersistedBattle {
 export async function persistBattleResult(
   attackerNationId: string,
   defenderNationId: string,
+  defenderName: string,
   result: BattleResult,
   turnsCost: number,
 ): Promise<PersistedBattle> {
   return prisma.$transaction(async (tx) => {
-    // 1. Create battle record
+    // 1. Land (razing buildings as needed) — computed here from fresh data
+    let defenderTotalAfter: number | null = null;
+    let final: BattleResult = result;
+    if (result.winner === "ATTACKER") {
+      const seized = await seizeLand(tx, attackerNationId, defenderNationId);
+      defenderTotalAfter = seized.defenderTotalAfter;
+      final = {
+        ...result,
+        landGained:         seized.landTaken,
+        buildingsDestroyed: seized.buildingsDestroyed,
+        summary: `${result.summary} ${lootText(defenderName, seized.landTaken, seized.buildingsDestroyed, result.moneyStolen)}`,
+      };
+    }
+
+    // 2. Battle record
     const b = await tx.battle.create({
       data: {
         worldId:         "world_01",
         attackerNationId,
         defenderNationId,
-        winner:      result.winner,
+        winner:      final.winner,
         status:      "RESOLVED",
-        seed:        result.seed,
-        landGained:  result.landGained,
-        moneyStolen: result.moneyStolen,
+        seed:        final.seed,
+        landGained:  final.landGained,
+        moneyStolen: final.moneyStolen,
         turnsCost,
       },
     });
 
-    // 2. Transfer money
+    // 3. Transfer money
     if (result.moneyStolen > 0) {
       await tx.resource.update({
         where: { nationId: defenderNationId },
@@ -292,18 +366,6 @@ export async function persistBattleResult(
       await tx.resource.update({
         where: { nationId: attackerNationId },
         data:  { money: { increment: result.moneyStolen } },
-      });
-    }
-
-    // 3. Transfer land
-    if (result.landGained > 0) {
-      await tx.resource.update({
-        where: { nationId: defenderNationId },
-        data:  { land: { decrement: result.landGained } },
-      });
-      await tx.resource.update({
-        where: { nationId: attackerNationId },
-        data:  { land: { increment: result.landGained } },
       });
     }
 
@@ -325,22 +387,22 @@ export async function persistBattleResult(
     await tx.battleReport.create({
       data: {
         battleId: b.id,
-        payload:  JSON.parse(JSON.stringify(result)),
+        payload:  JSON.parse(JSON.stringify(final)),
       },
     });
 
     // 7. Ruin shield — a beaten enclave at the land floor gets time to recover
     let defenderShieldUntil: Date | null = null;
-    if (result.winner === "ATTACKER") {
-      const def = await tx.resource.findUniqueOrThrow({
-        where:  { nationId: defenderNationId },
-        select: { land: true },
-      });
-      if (def.land <= COMBAT.LAND_FLOOR) {
-        defenderShieldUntil = await grantRuinShield(tx, defenderNationId);
-      }
+    if (defenderTotalAfter !== null && defenderTotalAfter <= COMBAT.LAND_FLOOR) {
+      defenderShieldUntil = await grantRuinShield(tx, defenderNationId);
     }
 
-    return { battleId: b.id, defenderShieldUntil };
+    return {
+      battleId:           b.id,
+      landGained:         final.landGained,
+      buildingsDestroyed: final.buildingsDestroyed,
+      summary:            final.summary,
+      defenderShieldUntil,
+    };
   }, { timeout: 15_000 });  // several round-trips to a remote DB — default 5s is tight
 }

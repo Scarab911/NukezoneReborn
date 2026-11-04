@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { calcNetworth } from "@/lib/networth";
+import { calcNetworth, totalLand } from "@/lib/networth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns, minutesToNextTurn } from "@/server/game-engine/turns";
@@ -15,9 +15,10 @@ export default async function DashboardPage() {
   const nation = await prisma.nation.findUnique({
     where: { playerId: session.user.id },
     include: {
-      resource: true,
-      morale:   true,
-      _count:   { select: { armies: true, spyUnits: true, attackingBattles: true } },
+      resource:  true,
+      morale:    true,
+      buildings: { select: { count: true } },
+      _count:    { select: { armies: true, spyUnits: true, attackingBattles: true } },
     },
   });
 
@@ -43,7 +44,10 @@ export default async function DashboardPage() {
       resources={{
         money:  nation.resource?.money  ?? 0,
         land:   nation.resource?.land   ?? 0,
-        power:  calcNetworth({ totalUnits: nation.totalUnits, land: nation.resource?.land ?? 0 }),
+        power:  calcNetworth({
+          totalUnits: nation.totalUnits,
+          land:       totalLand(nation.resource?.land ?? 0, nation.buildings.reduce((s, b) => s + b.count, 0)),
+        }),
         energy: nation.resource?.energy ?? 0,
       }}
     />

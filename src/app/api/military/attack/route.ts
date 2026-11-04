@@ -5,7 +5,7 @@ import { z } from "zod";
 import { resolveInstant, persistBattleResult } from "@/server/game-engine/combat";
 import { spendTurns, syncTurns } from "@/server/game-engine/turns";
 import { TURNS } from "@/lib/game-constants";
-import { calcNetworth, rangeStatus } from "@/lib/networth";
+import { calcNetworth, rangeStatus, totalLand } from "@/lib/networth";
 import {
   liftProtectionIfExpired, protectionExpired, removeProtection,
 } from "@/server/services/protection.service";
@@ -63,10 +63,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Networth range — both sides must be within reach of each other
-  const range = rangeStatus(
-    calcNetworth({ totalUnits: attackerNation.totalUnits, land: attackerNation.resource?.land ?? 0 }),
-    calcNetworth({ totalUnits: defenderNation.totalUnits, land: defenderNation.resource?.land ?? 0 }),
-  );
+  const networthOf = (n: typeof attackerNation) => calcNetworth({
+    totalUnits: n.totalUnits,
+    land:       totalLand(n.resource?.land ?? 0, n.buildings.reduce((s, b) => s + b.count, 0)),
+  });
+  const range = rangeStatus(networthOf(attackerNation), networthOf(defenderNation));
   if (range !== "IN_RANGE") {
     return NextResponse.json({
       error: range === "TOO_WEAK"
@@ -112,8 +113,8 @@ export async function POST(req: NextRequest) {
   const result = resolveInstant(attackerNation, defenderNation);
 
   await spendTurns(attackerNation.id, TURNS.ATTACK_COST);
-  const { battleId, defenderShieldUntil } = await persistBattleResult(
-    attackerNation.id, defenderNation.id, result, TURNS.ATTACK_COST,
+  const { battleId, landGained, buildingsDestroyed, summary, defenderShieldUntil } = await persistBattleResult(
+    attackerNation.id, defenderNation.id, defenderNation.name, result, TURNS.ATTACK_COST,
   );
 
   await prisma.notification.create({
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
       nationId: defenderNation.id,
       type:     "BATTLE_RESOLVED",
       payload:  {
-        from: attackerNation.name, winner: result.winner, battleId, summary: result.summary,
+        from: attackerNation.name, winner: result.winner, battleId, summary, buildingsDestroyed,
         // Defender was ruined down to the land floor and is shielded until this time
         shieldUntil: defenderShieldUntil?.toISOString() ?? null,
       },
@@ -132,8 +133,9 @@ export async function POST(req: NextRequest) {
     success:              true,
     battleId,
     winner:               result.winner,
-    summary:              result.summary,
-    landGained:           result.winner === "ATTACKER" ? result.landGained  : 0,
+    summary,
+    landGained,
+    buildingsDestroyed,
     moneyStolen:          result.winner === "ATTACKER" ? result.moneyStolen : 0,
     attackerLost:         result.attackerLost,
     defenderLost:         result.defenderLost,

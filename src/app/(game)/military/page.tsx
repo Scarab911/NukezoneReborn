@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns } from "@/server/game-engine/turns";
-import { calcNetworth, attackRange } from "@/lib/networth";
+import { calcNetworth, attackRange, totalLand } from "@/lib/networth";
 import { MilitaryContent } from "./MilitaryContent";
 
 export default async function MilitaryPage() {
@@ -12,8 +12,9 @@ export default async function MilitaryPage() {
   const me = await prisma.nation.findUnique({
     where:   { playerId: session.user.id },
     include: {
-      resource: true,
-      armies:   { include: { units: { include: { unitType: true } } } },
+      resource:  true,
+      buildings: { select: { count: true } },
+      armies:    { include: { units: { include: { unitType: true } } } },
     },
   });
   if (!me) redirect("/setup");
@@ -33,12 +34,15 @@ export default async function MilitaryPage() {
       totalUnits: true,   // used server-side for power calc only
       status:     true,
       resource:   { select: { land: true } },
+      buildings:  { select: { count: true } },
     },
     orderBy: { totalUnits: "desc" },
     take:    100,
   });
 
-  const myPower = calcNetworth({ totalUnits: me.totalUnits, land: me.resource?.land ?? 0 });
+  const landOf = (n: { resource: { land: number } | null; buildings: Array<{ count: number }> }) =>
+    totalLand(n.resource?.land ?? 0, n.buildings.reduce((s, b) => s + b.count, 0));
+  const myPower = calcNetworth({ totalUnits: me.totalUnits, land: landOf(me) });
   const protectionExpiresAt = me.status === "PROTECTED"
     ? me.protectedUntil?.toISOString() ?? null
     : null;
@@ -64,8 +68,8 @@ export default async function MilitaryPage() {
         id:     t.id,
         name:   t.name,
         color:  t.color,
-        land:   t.resource?.land ?? 0,
-        power:  calcNetworth({ totalUnits: t.totalUnits, land: t.resource?.land ?? 0 }),
+        land:   landOf(t),
+        power:  calcNetworth({ totalUnits: t.totalUnits, land: landOf(t) }),
         status: t.status,
       }))}
     />

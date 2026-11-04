@@ -18,10 +18,12 @@
 
 | Rule | Value | Where |
 |------|-------|-------|
-| Networth | `totalUnits × 10 + land × 5` | `calcNetworth` in `src/lib/networth.ts` |
+| Total land | Free land (`Resource.land`) + 5 × buildings — building consumes free land | `totalLand` |
+| Networth | `totalUnits × 10 + totalLand × 5` (building never lowers networth) | `calcNetworth` in `src/lib/networth.ts` |
 | Attack range | `myNW × 0.5 ≤ targetNW ≤ myNW ÷ 0.5` — always mutual | `attackRange` / `rangeStatus`; checked in the attack route (403 if out of range) |
-| Land taken on win | 5% of defender land (min 1), never below the land floor | `landTakenOnWin` |
-| Land floor | 100 (= starting land) — combat ruins an enclave, never destroys it | `COMBAT.LAND_FLOOR` |
+| Land taken on win | 5% of defender **total** land (min 1), never below the land floor | `landTakenOnWin` |
+| Buildings razed | The grab is split between free and built land in proportion; built land is claimed by razing buildings (5 land each), spread across types by count. Freed land the attacker doesn't take stays with the defender | `planLandSeizure`; applied in `seizeLand` inside the battle transaction |
+| Land floor | 100 total land (= starting land) — combat ruins an enclave, never destroys it | `COMBAT.LAND_FLOOR` |
 | Ruin shield | Defender at the floor after a loss → PROTECTED for 24h | `grantRuinShield` in `protection.service.ts` |
 | New-player protection | 72h from founding | `newPlayerProtectionUntil` |
 | Shield storage | `Nation.protectedUntil`; expired shields are lifted lazily | `liftProtectionIfExpired` |

@@ -12,6 +12,8 @@ Format: `## [version or date] — Description`
 - **Fixed**: military page "In range" filter button was missing
 - **Removed**: unused `decrementUnits` from `nation.service.ts`
 - Verified in the running app with 3 test accounts (range, land floor, ruin shield, abandon, casualties)
+- **Added**: winning attacks raze defender buildings — land taken comes from free and built land in proportion (`planLandSeizure`)
+- **Changed**: networth, attack range, land floor and rankings use total land (free + 5 × buildings); building no longer lowers networth
 
 ## [2026-11-03] — Attack Range + Ruin Instead of Destruction
 

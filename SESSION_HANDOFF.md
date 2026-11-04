@@ -11,6 +11,8 @@
 - **Fixed** missing "In range" filter button on the military page (`1a9165e`)
 - **Battle casualties**: `applyCasualties` in `combat.ts` removes losses inside the battle transaction, re-reading stacks so concurrent battles can't go negative; `distributeLosses` splits proportionally (largest remainder). `Nation.totalUnits` is set from the real remaining count, which also repairs drifted counters. Transaction timeout raised to 15s
 - Verified live: 70 Spear + 30 Ranger losing 10 → 63 + 27; defender 10 → 7 (its stale `totalUnits` of 300 corrected to 7)
+- **Building razing** (owner's decision: the defender must lose buildings so the attacker can claim the land). `Resource.land` is *free* land only — building consumes it — so `totalLand = free + 5 × buildings` now drives networth, range, the land floor and rankings. `planLandSeizure` (pure, `networth.ts`) splits the 5% grab between free and built land proportionally; `seizeLand` (`combat.ts`) razes buildings across types inside the battle transaction. Battle summary/response/notification report `buildingsDestroyed`
+- Verified live: defender with 400 free + 40 buildings (600 total) lost 30 land = 20 free + 2 buildings razed (War Factory, Airfield); attacker free land 1000 → 1030
 
 ### Test Data (kept on purpose)
 - Enclaves `QA Alpha Prime`, `QA Bravo`, `QA Charlie`; alliance `QA Pact` (Charlie leads). Their stats were set by SQL for testing; they're not natural game states
