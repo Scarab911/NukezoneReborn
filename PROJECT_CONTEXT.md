@@ -125,7 +125,7 @@ NukezoneReborn/
 - [ ] Database schema design
 - [ ] Authentication system
 - [ ] Core game engine (tick, resources)
-- [ ] Map system
+
 - [ ] Arsenal / weapons system
 - [ ] Combat system
 - [ ] Diplomacy system
