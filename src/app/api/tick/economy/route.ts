@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ECONOMY, MORALE } from "@/lib/game-constants";
+import { enforceHousing } from "@/server/services/housing.service";
 
 const TICK_INTERVAL_MS = 30_000;
 
@@ -21,6 +22,13 @@ export async function POST() {
     if (!nation || nation.status === "DESTROYED") return NextResponse.json({ ticks: 0 });
     if (!nation.resource) return NextResponse.json({ ticks: 0 });
 
+    // Lazy housing check: units whose desertion deadline passed leave now.
+    // Runs before the tick maths so upkeep is charged on the army that's left.
+    await prisma.$transaction((tx) => enforceHousing(tx, nation.id), { timeout: 15_000 });
+    const { totalUnits } = await prisma.nation.findUniqueOrThrow({
+      where: { id: nation.id }, select: { totalUnits: true },
+    });
+
     const lastTick    = nation.resource.updatedAt;
     const msSinceLast = Date.now() - lastTick.getTime();
     const ticks       = Math.floor(msSinceLast / TICK_INTERVAL_MS);
@@ -31,7 +39,7 @@ export async function POST() {
     const land = nation.resource.land;
 
     const incomePerTick = Math.floor(land * ECONOMY.BASE_INCOME_PER_LAND * moraleMultiplier);
-    const upkeepPerTick = Math.floor(nation.totalUnits * ECONOMY.UPKEEP_PER_UNIT);
+    const upkeepPerTick = Math.floor(totalUnits * ECONOMY.UPKEEP_PER_UNIT);
     const netPerTick    = incomePerTick - upkeepPerTick;
     const totalNet      = netPerTick * ticks;
     const moraleDelta   = ticks * MORALE.REGEN_BASE;

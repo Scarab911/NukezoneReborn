@@ -1,7 +1,8 @@
-import { COMBAT, MORALE } from "@/lib/game-constants";
+import { BUILDINGS, COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
 import { planLandSeizure, totalLand } from "@/lib/networth";
 import { grantRuinShield } from "@/server/services/protection.service";
+import { syncOverflowDeadlines, type OverflowDeadlines } from "@/server/services/housing.service";
 import type { Resource, MoraleRecord, UnitType, Building, Prisma } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -96,25 +97,12 @@ function counterMultiplierFor(attackerCat: string, defCounts: Record<string, num
 function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, number>): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
 
-  // Building bonuses
-  const warFactory  = nation.buildings.find((b) => b.type === "WAR_FACTORY")?.count  ?? 0;
-  const airfield    = nation.buildings.find((b) => b.type === "AIRFIELD")?.count    ?? 0;
-  const shipyard    = nation.buildings.find((b) => b.type === "SHIPYARD")?.count    ?? 0;
-  const buildingBonus = (cat: string) => {
-    if (cat === "GROUND")   return 1 + warFactory * 0.05;
-    if (cat === "AIR")      return 1 + airfield   * 0.05;
-    if (cat === "SEA")      return 1 + shipyard   * 0.05;
-    return 1;
-  };
-
   let power = 0;
   for (const army of nation.armies) {
     for (const unit of army.units) {
       if (unit.quantity <= 0) continue;
-      const cat         = unit.unitType.category;
-      const catBonus    = buildingBonus(cat);
-      const counterMult = counterMultiplierFor(cat, defenderCounts);
-      power += unit.quantity * unit.unitType.attack * catBonus * counterMult;
+      const counterMult = counterMultiplierFor(unit.unitType.category, defenderCounts);
+      power += unit.quantity * unit.unitType.attack * counterMult;
     }
   }
 
@@ -124,7 +112,7 @@ function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, nu
 function calcDefensePower(nation: CombatNation, attackerCounts: Record<string, number>): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
   const towers     = nation.buildings.find((b) => b.type === "DEFENSE_TOWERS")?.count ?? 0;
-  const towerBonus = 1 + towers * 0.08;
+  const towerBonus = 1 + towers * BUILDINGS.DEFENSE_TOWER_BONUS;
 
   let power = 0;
   for (const army of nation.armies) {
@@ -318,6 +306,8 @@ export interface PersistedBattle {
   summary:             string;
   /** Set when the defender was knocked down to the land floor and got a ruin shield. */
   defenderShieldUntil: Date | null;
+  /** Defender housing types left over capacity, with their desertion deadlines. */
+  defenderOverflow:    OverflowDeadlines;
 }
 
 export async function persistBattleResult(
@@ -373,6 +363,11 @@ export async function persistBattleResult(
     await applyCasualties(tx, attackerNationId, result.attackerLost);
     await applyCasualties(tx, defenderNationId, result.defenderLost);
 
+    // 4b. Housing — razing may leave the defender's army without room (starts a
+    // desertion deadline); losses may let either side's army fit again
+    const defenderOverflow = await syncOverflowDeadlines(tx, defenderNationId);
+    await syncOverflowDeadlines(tx, attackerNationId);
+
     // 5. Apply morale changes
     await tx.moraleRecord.update({
       where: { nationId: attackerNationId },
@@ -403,6 +398,7 @@ export async function persistBattleResult(
       buildingsDestroyed: final.buildingsDestroyed,
       summary:            final.summary,
       defenderShieldUntil,
+      defenderOverflow,
     };
   }, { timeout: 15_000 });  // several round-trips to a remote DB — default 5s is tight
 }

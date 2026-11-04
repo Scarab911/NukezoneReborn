@@ -222,6 +222,9 @@ model Building {
   nationId String
   type     BuildingType
   count    Int          @default(0)
+  /// Housing buildings only: set when the army outgrew this type's capacity
+  /// (e.g. after razing). If still over capacity at this time, the excess deserts.
+  overflowDeadline DateTime?
   nation Nation @relation(fields: [nationId], references: [id], onDelete: Cascade)
   @@unique([nationId, type])
   @@index([nationId])
@@ -728,6 +731,7 @@ enum BattleStatus {
 }
 
 enum BuildingType {
+  BARRACKS
   WAR_FACTORY
   AIRFIELD
   SHIPYARD
@@ -891,6 +895,8 @@ enum NotificationType {
   WORLD_EVENT
   NATION_DESTROYED
   STARVATION_WARNING
+  GARRISON_OVERFLOW
+  UNITS_DESERTED
 }
 
 enum WorldEventType {

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ArsenalContent } from "./ArsenalContent";
+import { HOUSING_BUILDINGS, HOUSING_LABEL, housingFor, listOverflows } from "@/lib/housing";
+import { getBuildingsOverview } from "@/server/services/building.service";
 
 export default async function ArsenalPage() {
   const session = await auth();
@@ -12,6 +14,10 @@ export default async function ArsenalPage() {
     include: { resource: true },
   });
   if (!nation) redirect("/setup");
+
+  // Applies any expired desertion first, so owned units and housing are current
+  const overview = await getBuildingsOverview(session.user.id);
+  if (!overview) redirect("/setup");
 
   const [unitTypes, armies, trainingQueue] = await Promise.all([
     prisma.unitType.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -34,8 +40,15 @@ export default async function ArsenalPage() {
 
   return (
     <ArsenalContent
-      money={nation.resource?.money ?? 0}
-      turns={nation.turns}
+      money={overview.money}
+      turns={overview.turns}
+      housing={HOUSING_BUILDINGS.map((b) => ({
+        building: b,
+        label:    HOUSING_LABEL[b],
+        used:     overview.usage[b],
+        capacity: overview.capacity[b],
+      }))}
+      overflows={listOverflows(overview.capacity, overview.usage, overview.deadlines)}
       ownedUnits={ownedUnits}
       unitTypes={unitTypes.map((u) => ({
         id:          u.id,
@@ -48,6 +61,7 @@ export default async function ArsenalPage() {
         upkeep:      u.upkeep,
         requiresTech: u.requiresTech,
         sortOrder:   u.sortOrder,
+        housing:     housingFor(u.slug),
       }))}
       trainingQueue={trainingQueue.map((t) => ({
         id:          t.id,

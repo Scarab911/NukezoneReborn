@@ -4,6 +4,49 @@
 
 ---
 
+## Session: 2026-11-04 (later) — Building Audit + Army Housing
+
+### What Was Done
+- **Audit of the building mechanic.** Findings were:
+  - turn errors crashed the build route (500);
+  - money, land and turns weren't spent atomically;
+  - Research Lab, Power Plant and Missile Silo did nothing;
+  - the economy tick clock resets on any `Resource` write;
+  - the land cap only checks free land.
+  The first two are fixed; the rest are in TODO.
+- **Army housing** (owner's design): units live in buildings.
+  - **Buildings:** Barracks (new: infantry + special), War Factory (vehicles), Airfield (air), Shipyard (sea), Missile Silo (strategic).
+  - **Space:** each unit type takes space (`HOUSING` in `game-constants.ts`).
+  - **Building rules:** no per-type cap (land is the limit); attack bonuses removed; Defense Towers keep +8% defense.
+  - **Overflow:** razing that leaves an army without room starts a **24h deadline** (`Building.overflowDeadline`, never moved by later razes). Training is blocked meanwhile. After the deadline only the excess deserts, spread proportionally by space (largest remainder).
+  - **Lazy evaluation:** `enforceHousing` runs in the economy tick, on the Buildings and Arsenal pages, before train/build, and for both sides before a battle.
+  - **Notifications:** `GARRISON_OVERFLOW` and `UNITS_DESERTED`.
+- **New files:**
+  - `src/lib/housing.ts` (pure maths)
+  - `src/server/services/housing.service.ts`
+  - `src/server/services/building.service.ts` (atomic build + page overview)
+  - `src/components/game/OverflowBanner.tsx`
+- **Pages:**
+  - Buildings: space used/capacity, countdown banner, "No effect yet" on Lab/Power Plant.
+  - Arsenal: housing summary, space per unit, training disabled when it won't fit.
+- **New enclaves** start with 2 Barracks (90 free land + 10 built).
+- **DB migration (Supabase MCP):** `BuildingType.BARRACKS`, `Building.overflowDeadline`, `NotificationType.GARRISON_OVERFLOW/UNITS_DESERTED`. Backfill: every living enclave got 2 Barracks (−10 free land); all existing armies fit.
+
+### Verified
+- `tsc` and `eslint` are clean.
+- Pure maths: 2,000 random desertion cases.
+- **Housing service against the real DB**, inside a rolled-back transaction (QA Alpha Prime, 81 infantry). All of these held:
+  - 19 more units fit and 20 don't;
+  - the deadline is 24h and a later raze doesn't move it;
+  - rebuilding clears it;
+  - after the deadline 31 over → exactly 31 deserted (22 Spear, 9 Ranger);
+  - `totalUnits` re-synced and both notifications were written.
+
+### Not Yet Verified
+- **Not exercised in the running app.** The running dev server (port 3000) still has the old Prisma client loaded and returns 500 on `/api/buildings`; restart it first. Then test train-to-cap, raze → banner, rebuild, and desertion via SQL-backdated deadline.
+
+---
+
 ## Session: 2026-11-04 — In-App Test + Battle Casualties
 
 ### What Was Done

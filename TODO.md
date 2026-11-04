@@ -1,6 +1,6 @@
 # TODO.md — NukezoneReborn
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ---
 
@@ -16,7 +16,8 @@ Last updated: 2026-11-03
 | Turns | 50 start, +1/5min, max 100 | Limits session length |
 | Exploration | Diminishing returns (500→10 land, 1→N turns) | Passive land growth mechanic |
 | Units | 18 named types across 5 categories | Redesigned from 30 generic types |
-| Buildings | Multiplier-only, consume land | Upgrade path without map complexity |
+| Buildings | House the army (Barracks, War Factory, Airfield, Shipyard, Missile Silo); consume land; no per-type cap. Defense Towers keep +8% defense | Army size tied to land; razing hurts (2026-11-04) |
+| Housing overflow | Razed housing → 24h to rebuild, then the excess deserts proportionally; training blocked meanwhile | Not instant punishment, not toothless |
 | Player identity | Enclave name only (no player/display name) | One world, one enclave per player |
 | Terminology | "Enclave" in UI; `Nation` stays in code/DB | Post-apocalyptic fit without a risky rename |
 | Destruction | Combat ruins, never destroys: land floor 100 + 24h ruin shield. Restart only via "Abandon enclave" | Keeps beaten players in the game; old record kept (`formerPlayerId`) |
@@ -87,6 +88,14 @@ Last updated: 2026-11-03
 - [x] Battles remove lost units — split proportionally across unit types; `Nation.totalUnits` re-synced from real armies (2026-11-04)
 - [ ] Test lazy expiry of the 72h new-player shield (set `protectedUntil` in the past, then attack)
 - [x] Attacks raze buildings: land taken comes from free and built land proportionally; razed buildings free their land for the attacker (2026-11-04)
+- [x] Army housing: units take space in housing buildings; Barracks added; attack bonuses removed; 24h overflow deadline → proportional desertion (2026-11-04)
+- [x] Building service: one atomic transaction (turns + money + land guarded), turn errors returned as 400, destroyed enclaves rejected (2026-11-04)
+- [ ] Verify housing in running app (dev server must be restarted to load the new Prisma client): train to cap → rejected; raze barracks → banner + deadline; rebuild clears; past deadline → desertion
+- [ ] Research Lab / Power Plant have no effect yet (labelled on the page) — implement or remove
+- [ ] Economy tick uses `Resource.updatedAt` as its clock, so any resource write (build, explore, battle) resets accrued income — add a dedicated `lastTickAt`
+- [ ] Explore's 10,000 land cap checks free land only, so building lets total land exceed it; battle land gains ignore the cap
+- [ ] Income counts free land only, so each building costs 50 money/tick in lost income — decide if intended
+- [ ] Attack route: `spendTurns` throw is uncaught (500 on a race)
 - [ ] Dashboard/settings "Land" still shows free land only — consider showing total (free + built)
 - [ ] Watch for shield farming (staying at 100 land to be shielded after each loss); add a cooldown if needed
 - [ ] Hide destroyed enclaves from message recipients

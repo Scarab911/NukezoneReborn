@@ -81,7 +81,10 @@ export const COMBAT = {
 // ── Buildings ─────────────────────────────────────────────────────────────
 export const BUILDINGS = {
   LAND_PER_BUILDING: 5,     // each building consumes 5 land
+  MAX_PER_ORDER:     5,     // buildings per build request — land is the only total limit
+  STARTING_BARRACKS: 2,     // a new enclave starts with these (on its starting land)
   MONEY_COST: {
+    BARRACKS:       400,
     WAR_FACTORY:    500,
     AIRFIELD:       800,
     SHIPYARD:       1000,
@@ -90,17 +93,44 @@ export const BUILDINGS = {
     MISSILE_SILO:   2000,
     DEFENSE_TOWERS: 300,
   },
-  // Multipliers per building (stack additively up to max)
-  BONUS: {
-    WAR_FACTORY:    0.05,   // +5% ground unit attack per building
-    AIRFIELD:       0.05,   // +5% air unit attack per building
-    SHIPYARD:       0.05,   // +5% sea unit attack per building
-    RESEARCH_LAB:   0.10,   // +10% research speed per building
-    POWER_PLANT:    50,     // +50 energy per building
-    MISSILE_SILO:   1,      // +1 strategic weapon slot per silo
-    DEFENSE_TOWERS: 0.08,   // +8% defense per building
-  },
-  MAX_PER_TYPE: 10,         // max 10 of any building type
+  DEFENSE_TOWER_BONUS: 0.08, // +8% defense per Defense Tower
+} as const;
+
+// ── Housing ───────────────────────────────────────────────────────────────
+// Units live in buildings. Each unit type takes `space` in one housing building;
+// each building of that type provides CAPACITY space. When razing leaves an army
+// without room, the owner has OVERFLOW_GRACE_HOURS to fix it before the excess deserts.
+export type HousingBuilding = "BARRACKS" | "WAR_FACTORY" | "AIRFIELD" | "SHIPYARD" | "MISSILE_SILO";
+
+export const HOUSING = {
+  OVERFLOW_GRACE_HOURS: 24,
+  CAPACITY: {
+    BARRACKS:     50,
+    WAR_FACTORY:  20,
+    AIRFIELD:     15,
+    SHIPYARD:     10,
+    MISSILE_SILO: 1,
+  } satisfies Record<HousingBuilding, number>,
+  UNITS: {
+    "ranger-squad":         { building: "BARRACKS",     space: 1 },
+    "spear-team":           { building: "BARRACKS",     space: 1 },
+    "ghost-operators":      { building: "BARRACKS",     space: 1 },
+    "shadow-cell":          { building: "BARRACKS",     space: 2 },
+    "stealth-raider-wing":  { building: "BARRACKS",     space: 3 },
+    "titan-apc":            { building: "WAR_FACTORY",  space: 3 },
+    "storm-artillery":      { building: "WAR_FACTORY",  space: 3 },
+    "titan-mbt":            { building: "WAR_FACTORY",  space: 4 },
+    "predator-drone-swarm": { building: "AIRFIELD",     space: 2 },
+    "viper-gunship":        { building: "AIRFIELD",     space: 3 },
+    "strike-jet-squadron":  { building: "AIRFIELD",     space: 4 },
+    "leviathan-destroyer":  { building: "SHIPYARD",     space: 3 },
+    "phantom-submarine":    { building: "SHIPYARD",     space: 3 },
+    "atlas-carrier":        { building: "SHIPYARD",     space: 6 },
+    "emp-missile":          { building: "MISSILE_SILO", space: 1 },
+    "chemical-missile":     { building: "MISSILE_SILO", space: 1 },
+    "biochemical-missile":  { building: "MISSILE_SILO", space: 1 },
+    "nuclear-missile":      { building: "MISSILE_SILO", space: 1 },
+  } satisfies Record<string, { building: HousingBuilding; space: number }>,
 } as const;
 
 // ── Banking ───────────────────────────────────────────────────────────────

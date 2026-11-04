@@ -9,6 +9,7 @@ import { calcNetworth, rangeStatus, totalLand } from "@/lib/networth";
 import {
   liftProtectionIfExpired, protectionExpired, removeProtection,
 } from "@/server/services/protection.service";
+import { enforceHousing } from "@/server/services/housing.service";
 
 const Schema = z.object({
   targetNationId: z.string().min(1),
@@ -25,6 +26,19 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const { targetNationId, acknowledgeProtectionLoss = false } = parsed.data;
+
+  // Apply any expired desertion on both sides first, so units that have left
+  // (e.g. an offline defender's) never fight
+  const [me, target] = await Promise.all([
+    prisma.nation.findUnique({ where: { playerId: session.user.id }, select: { id: true, status: true } }),
+    prisma.nation.findUnique({ where: { id: targetNationId },        select: { id: true, status: true } }),
+  ]);
+  if (me && target && me.id !== target.id && me.status !== "DESTROYED" && target.status !== "DESTROYED") {
+    await prisma.$transaction(async (tx) => {
+      await enforceHousing(tx, me.id);
+      await enforceHousing(tx, target.id);
+    }, { timeout: 15_000 });
+  }
 
   const attackerNation = await prisma.nation.findUnique({
     where:   { playerId: session.user.id },
@@ -113,7 +127,7 @@ export async function POST(req: NextRequest) {
   const result = resolveInstant(attackerNation, defenderNation);
 
   await spendTurns(attackerNation.id, TURNS.ATTACK_COST);
-  const { battleId, landGained, buildingsDestroyed, summary, defenderShieldUntil } = await persistBattleResult(
+  const { battleId, landGained, buildingsDestroyed, summary, defenderShieldUntil, defenderOverflow } = await persistBattleResult(
     attackerNation.id, defenderNation.id, defenderNation.name, result, TURNS.ATTACK_COST,
   );
 
@@ -125,6 +139,10 @@ export async function POST(req: NextRequest) {
         from: attackerNation.name, winner: result.winner, battleId, summary, buildingsDestroyed,
         // Defender was ruined down to the land floor and is shielded until this time
         shieldUntil: defenderShieldUntil?.toISOString() ?? null,
+        // Housing types left over capacity → when the excess units desert
+        overflowDeadlines: Object.fromEntries(
+          Object.entries(defenderOverflow).map(([type, d]) => [type, d.toISOString()]),
+        ),
       },
     },
   });

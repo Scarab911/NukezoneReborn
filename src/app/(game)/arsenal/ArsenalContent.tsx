@@ -5,6 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArsenalTrainForm } from "./ArsenalTrainForm";
+import { OverflowBanner, type Overflow } from "@/components/game/OverflowBanner";
+import type { HousingBuilding } from "@/lib/game-constants";
+import type { UnitHousing } from "@/lib/housing";
 
 type UnitCat = "GROUND" | "AIR" | "SEA" | "SPECIAL" | "STRATEGIC";
 
@@ -12,12 +15,22 @@ interface UnitTypeData {
   id: string; name: string; slug: string; category: string;
   attack: number; defense: number; moneyCost: number; upkeep: number;
   requiresTech: string | null; sortOrder: number;
+  housing: UnitHousing;
+}
+
+interface HousingRow {
+  building: HousingBuilding;
+  label:    string;
+  used:     number;
+  capacity: number;
 }
 
 interface Props {
   money:         number;
   turns:         number;
   ownedUnits:    Record<string, number>;
+  housing:       HousingRow[];
+  overflows:     Overflow[];
   unitTypes:     UnitTypeData[];
   trainingQueue: Array<{ id: string; unitTypeId: string; quantity: number; completesAt: string }>;
 }
@@ -45,7 +58,7 @@ const COUNTER_HINT: Record<string, string> = {
   "stealth-raider-wing":   "Counters: Leviathan Destroyer",
 };
 
-export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQueue }: Props) {
+export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, unitTypes, trainingQueue }: Props) {
   const [activeTab, setActiveTab] = useState<UnitCat>("GROUND");
 
   const byCategory = Object.fromEntries(
@@ -64,6 +77,22 @@ export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQu
       <div className="flex gap-2 text-xs font-mono">
         <span className="text-yellow-400">💰 {money.toLocaleString()}</span>
         <span className="text-purple-400">⚡ {turns} turns</span>
+      </div>
+
+      <OverflowBanner overflows={overflows} />
+
+      {/* Housing — units live in buildings */}
+      <div className="flex flex-wrap gap-2 text-xs font-mono">
+        {housing.map((h) => (
+          <span
+            key={h.building}
+            className={`px-2 py-1 rounded border ${
+              h.used > h.capacity ? "border-red-800/60 text-red-400" : "border-slate-800 text-slate-400"
+            }`}
+          >
+            🏠 {h.label} {h.used.toLocaleString()}/{h.capacity.toLocaleString()}
+          </span>
+        ))}
       </div>
 
       {/* Training queue */}
@@ -101,6 +130,8 @@ export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQu
         {visible.map((unit) => {
           const owned  = ownedUnits[unit.slug] ?? 0;
           const locked = !!unit.requiresTech;
+          const home   = housing.find((h) => h.building === unit.housing.building);
+          const free   = home ? home.capacity - home.used : 0;
 
           return (
             <Card key={unit.id} className={`bg-slate-900 border-slate-800 ${locked ? "opacity-55" : ""}`}>
@@ -128,7 +159,7 @@ export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQu
                 </div>
 
                 <div className="text-xs text-slate-500 mb-1">
-                  💰 {unit.moneyCost.toLocaleString()} per unit
+                  💰 {unit.moneyCost.toLocaleString()} per unit · 🏠 {unit.housing.space} space in {home?.label}
                 </div>
 
                 {COUNTER_HINT[unit.slug] && (
@@ -143,6 +174,9 @@ export function ArsenalContent({ money, turns, ownedUnits, unitTypes, trainingQu
                     unitName={unit.name}
                     moneyCost={unit.moneyCost}
                     availableMoney={money}
+                    space={unit.housing.space}
+                    freeSpace={free}
+                    housingLabel={home?.label ?? "housing"}
                   />
                 )}
               </CardContent>

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { BUILDINGS, HOUSING } from "@/lib/game-constants";
 
 export default async function DefensePage() {
   const session = await auth();
@@ -15,7 +16,7 @@ export default async function DefensePage() {
   const towers = nation.buildings.find((b) => b.type === "DEFENSE_TOWERS")?.count ?? 0;
   const silos  = nation.buildings.find((b) => b.type === "MISSILE_SILO")?.count    ?? 0;
   const ci     = nation.ciRating?.rating ?? 10;
-  const defenseBonus = Math.round(towers * 8);
+  const defenseBonus = Math.round(towers * BUILDINGS.DEFENSE_TOWER_BONUS * 100);
 
   return (
     <div className="space-y-6">
@@ -28,7 +29,7 @@ export default async function DefensePage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Defense Towers",  value: towers,        unit: "buildings", color: "text-blue-400",   emoji: "🛡️", note: `+${defenseBonus}% defense bonus` },
-          { label: "Missile Silos",   value: silos,         unit: "silos",     color: "text-red-400",    emoji: "🚀", note: `${silos} strategic weapon slots` },
+          { label: "Missile Silos",   value: silos,         unit: "silos",     color: "text-red-400",    emoji: "🚀", note: `Houses ${silos * HOUSING.CAPACITY.MISSILE_SILO} strategic missiles` },
           { label: "CI Rating",       value: ci,            unit: "/ 100",     color: "text-purple-400", emoji: "🕵️", note: "Counter-intelligence strength" },
         ].map(({ label, value, unit, color, emoji, note }) => (
           <div key={label} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -49,7 +50,7 @@ export default async function DefensePage() {
         <h2 className="text-slate-200 font-semibold text-sm mb-4">How to Strengthen Defense</h2>
         <div className="space-y-3 text-sm">
           {[
-            { action: "Build Defense Towers",   where: "/buildings", effect: "+8% defense per tower, stacks up to 10×", emoji: "🛡️" },
+            { action: "Build Defense Towers",   where: "/buildings", effect: `+${BUILDINGS.DEFENSE_TOWER_BONUS * 100}% defense per tower`, emoji: "🛡️" },
             { action: "Research Perimeter Defense", where: "/research", effect: "+10% unit defense across all units", emoji: "🔬" },
             { action: "Research Missile Defense",   where: "/research", effect: "+20% strategic intercept chance", emoji: "🎯" },
             { action: "Train SAM Tanks",         where: "/arsenal",   effect: "High defense units counter air attacks", emoji: "🚀" },

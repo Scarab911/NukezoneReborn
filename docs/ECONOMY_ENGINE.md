@@ -291,6 +291,32 @@ async function contributeToTreasury(nationId: string, allianceId: string, amount
 
 ---
 
+## Army Housing (current implementation, 2026-11)
+
+Units live in buildings. To field a bigger army, a player needs more housing buildings, and every building uses 5 free land. Army size is therefore tied to land.
+
+| Building | Houses | Space per building |
+|---|---|---|
+| Barracks | Infantry (Ranger, Spear, Ghost) + Special (Shadow Cell, Stealth Raider) | 50 |
+| War Factory | Armored vehicles and artillery (APC, MBT, Artillery) | 20 |
+| Airfield | Aircraft (Drones, Gunship, Jets) | 15 |
+| Shipyard | Naval vessels (Destroyer, Submarine, Carrier) | 10 |
+| Missile Silo | Strategic missiles | 1 |
+
+- Each unit type takes `space` (infantry 1, tanks 4, carriers 6, …). All numbers live in `HOUSING` in `src/lib/game-constants.ts`; the unit → building map is keyed by unit slug.
+- A new enclave starts with 2 Barracks on its starting land (90 free + 10 built).
+- There's no per-type building limit; land is the limit.
+- Training is rejected when the units wouldn't fit (`checkCanHouse`).
+
+**Overflow (after razing):**
+1. When an army no longer fits, that housing type gets `Building.overflowDeadline = now + 24h` and the owner gets a `GARRISON_OVERFLOW` notification. Later razes don't move the deadline.
+2. Until it fits again, training units of that type is blocked. Building more housing (or battle losses) clears the deadline.
+3. If it's still over capacity when the deadline passes, only the excess deserts. It's spread across that building's unit types in proportion to the space each uses (largest remainder), and the owner gets a `UNITS_DESERTED` notification.
+
+**Evaluated lazily, with no timers:** `enforceHousing` (`src/server/services/housing.service.ts`) runs in the economy tick, on the Buildings and Arsenal pages, before training and building, and for both sides before a battle. The pure maths is in `src/lib/housing.ts`.
+
+---
+
 ## Resource Sink Summary
 
 Why each sink exists:

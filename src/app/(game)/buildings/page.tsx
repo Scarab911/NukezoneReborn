@@ -1,87 +1,48 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { BuildingsContent } from "./BuildingsContent";
-import { BUILDINGS } from "@/lib/game-constants";
+import { BuildingsContent, type BuildingDef } from "./BuildingsContent";
+import { BUILDINGS, HOUSING, TURNS } from "@/lib/game-constants";
+import { isHousingBuilding, listOverflows } from "@/lib/housing";
+import { getBuildingsOverview } from "@/server/services/building.service";
+import type { BuildingType } from "@prisma/client";
+
+const DEFS: Array<{ type: BuildingType; label: string; emoji: string; effect: string; active: boolean }> = [
+  { type: "BARRACKS",       label: "Barracks",       emoji: "🪖", active: true,  effect: `Houses ${HOUSING.CAPACITY.BARRACKS} space of infantry and special forces` },
+  { type: "WAR_FACTORY",    label: "War Factory",    emoji: "🏭", active: true,  effect: `Houses ${HOUSING.CAPACITY.WAR_FACTORY} space of armored vehicles and artillery` },
+  { type: "AIRFIELD",       label: "Airfield",       emoji: "✈️", active: true,  effect: `Houses ${HOUSING.CAPACITY.AIRFIELD} space of aircraft` },
+  { type: "SHIPYARD",       label: "Shipyard",       emoji: "⚓", active: true,  effect: `Houses ${HOUSING.CAPACITY.SHIPYARD} space of naval vessels` },
+  { type: "MISSILE_SILO",   label: "Missile Silo",   emoji: "🚀", active: true,  effect: `Houses ${HOUSING.CAPACITY.MISSILE_SILO} strategic missile` },
+  { type: "DEFENSE_TOWERS", label: "Defense Towers", emoji: "🛡️", active: true,  effect: `+${BUILDINGS.DEFENSE_TOWER_BONUS * 100}% defense per tower` },
+  { type: "RESEARCH_LAB",   label: "Research Lab",   emoji: "🔬", active: false, effect: "No effect yet — planned: faster research" },
+  { type: "POWER_PLANT",    label: "Power Plant",    emoji: "⚡", active: false, effect: "No effect yet — planned: energy production" },
+];
 
 export default async function BuildingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const nation = await prisma.nation.findUnique({
-    where:   { playerId: session.user.id },
-    include: { resource: true, buildings: true },
-  });
-  if (!nation) redirect("/setup");
+  const overview = await getBuildingsOverview(session.user.id);
+  if (!overview) redirect("/setup");
 
-  const BUILDING_DEFS = [
-    {
-      type:    "WAR_FACTORY"    as const,
-      label:   "War Factory",
-      emoji:   "🏭",
-      effect:  "+5% ground unit attack per building",
-      moneyCost: BUILDINGS.MONEY_COST.WAR_FACTORY,
-    },
-    {
-      type:    "AIRFIELD"       as const,
-      label:   "Airfield",
-      emoji:   "✈️",
-      effect:  "+5% air unit attack per building",
-      moneyCost: BUILDINGS.MONEY_COST.AIRFIELD,
-    },
-    {
-      type:    "SHIPYARD"       as const,
-      label:   "Shipyard",
-      emoji:   "⚓",
-      effect:  "+5% sea unit attack per building",
-      moneyCost: BUILDINGS.MONEY_COST.SHIPYARD,
-    },
-    {
-      type:    "RESEARCH_LAB"   as const,
-      label:   "Research Lab",
-      emoji:   "🔬",
-      effect:  "+10% research speed per building",
-      moneyCost: BUILDINGS.MONEY_COST.RESEARCH_LAB,
-    },
-    {
-      type:    "POWER_PLANT"    as const,
-      label:   "Power Plant",
-      emoji:   "⚡",
-      effect:  "+50 energy per building",
-      moneyCost: BUILDINGS.MONEY_COST.POWER_PLANT,
-    },
-    {
-      type:    "MISSILE_SILO"   as const,
-      label:   "Missile Silo",
-      emoji:   "🚀",
-      effect:  "+1 strategic weapon slot per silo",
-      moneyCost: BUILDINGS.MONEY_COST.MISSILE_SILO,
-    },
-    {
-      type:    "DEFENSE_TOWERS" as const,
-      label:   "Defense Towers",
-      emoji:   "🛡️",
-      effect:  "+8% defense per building",
-      moneyCost: BUILDINGS.MONEY_COST.DEFENSE_TOWERS,
-    },
-  ];
-
-  const counts = Object.fromEntries(
-    nation.buildings.map((b) => [b.type, b.count]),
-  );
+  const buildings: BuildingDef[] = DEFS.map((d) => ({
+    ...d,
+    moneyCost: BUILDINGS.MONEY_COST[d.type],
+    count:     overview.counts[d.type] ?? 0,
+    housing:   isHousingBuilding(d.type)
+      ? { used: overview.usage[d.type], capacity: overview.capacity[d.type] }
+      : null,
+  }));
 
   return (
     <BuildingsContent
-      money={nation.resource?.money ?? 0}
-      land={nation.resource?.land   ?? 0}
-      turns={nation.turns}
-      buildings={BUILDING_DEFS.map((d) => ({
-        ...d,
-        count:     counts[d.type] ?? 0,
-        landCost:  BUILDINGS.LAND_PER_BUILDING,
-        maxCount:  BUILDINGS.MAX_PER_TYPE,
-        turnCost:  2,
-      }))}
+      money={overview.money}
+      land={overview.land}
+      turns={overview.turns}
+      landPerBuilding={BUILDINGS.LAND_PER_BUILDING}
+      turnsPerBuilding={TURNS.BUILD_COST}
+      maxPerOrder={BUILDINGS.MAX_PER_ORDER}
+      buildings={buildings}
+      overflows={listOverflows(overview.capacity, overview.usage, overview.deadlines)}
     />
   );
 }

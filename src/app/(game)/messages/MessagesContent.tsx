@@ -30,6 +30,8 @@ const TYPE_ICON: Record<string, string> = {
   NATION_DESTROYED:   "💥",
   STARVATION_WARNING: "🌾",
   ALLIANCE_INVITE:    "🤝",
+  GARRISON_OVERFLOW:  "🏚️",
+  UNITS_DESERTED:     "🚶",
 };
 
 export function MessagesContent({ notifications, nations }: Props) {

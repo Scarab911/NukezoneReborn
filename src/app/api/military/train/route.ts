@@ -2,17 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { checkCanHouse, enforceHousing } from "@/server/services/housing.service";
 
 const TrainSchema = z.object({
   unitTypeId: z.string().min(1),
   quantity:   z.number().int().min(1).max(9999),
 });
 
+/** Thrown inside the transaction to roll it back with a player-facing message. */
+class TrainRejected extends Error {}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body: unknown = await req.json();
+  const body: unknown = await req.json().catch(() => null);
   const parsed = TrainSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
@@ -28,6 +32,7 @@ export async function POST(req: NextRequest) {
 
   if (!nation)   return NextResponse.json({ error: "No enclave"    }, { status: 404 });
   if (!unitType) return NextResponse.json({ error: "Unknown unit" }, { status: 404 });
+  if (nation.status === "DESTROYED") return NextResponse.json({ error: "Enclave destroyed" }, { status: 403 });
 
   if (unitType.requiresTech) {
     const hasResearch = await prisma.researchProgress.findFirst({
@@ -45,22 +50,33 @@ export async function POST(req: NextRequest) {
   const army = await prisma.army.findFirst({ where: { nationId: nation.id } });
   if (!army) return NextResponse.json({ error: "No army found" }, { status: 404 });
 
-  await prisma.$transaction([
-    prisma.resource.update({
-      where: { nationId: nation.id },
-      data:  { money: { decrement: totalCost } },
-    }),
-    // Upsert unit into army
-    prisma.unit.upsert({
-      where:  { armyId_unitTypeId: { armyId: army.id, unitTypeId } },
-      update: { quantity: { increment: quantity } },
-      create: { armyId: army.id, unitTypeId, quantity },
-    }),
-    prisma.nation.update({
-      where: { id: nation.id },
-      data:  { totalUnits: { increment: quantity } },
-    }),
-  ]);
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Apply any expired desertion first, then check there's room
+      await enforceHousing(tx, nation.id);
+      const noRoom = await checkCanHouse(tx, nation.id, unitType.slug, quantity);
+      if (noRoom) throw new TrainRejected(noRoom);
+
+      const paid = await tx.resource.updateMany({
+        where: { nationId: nation.id, money: { gte: totalCost } },
+        data:  { money: { decrement: totalCost } },
+      });
+      if (paid.count === 0) throw new TrainRejected("Not enough money");
+
+      await tx.unit.upsert({
+        where:  { armyId_unitTypeId: { armyId: army.id, unitTypeId } },
+        update: { quantity: { increment: quantity } },
+        create: { armyId: army.id, unitTypeId, quantity },
+      });
+      await tx.nation.update({
+        where: { id: nation.id },
+        data:  { totalUnits: { increment: quantity } },
+      });
+    }, { timeout: 15_000 });
+  } catch (err) {
+    if (err instanceof TrainRejected) return NextResponse.json({ error: err.message }, { status: 400 });
+    throw err;
+  }
 
   return NextResponse.json({ success: true }, { status: 201 });
 }
