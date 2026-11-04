@@ -104,10 +104,10 @@
 /dashboard           ✅ Turns bar, morale, resources, ExplorePanel, economy tick
 /arsenal             ✅ 18 units in 5 tabs, counter hints, instant training
 /research            ✅ Tech tree, live countdown, auto-complete
-/military            ✅ Target list, instant attack, battle report inline
+/military            ✅ Target list, instant attack, battle report inline, networth range (50%–200%)
 /buildings           ✅ 7 building types, build form, land/money cost
 /defense             ✅ Tower/silo/CI stats, improvement guide
-/settings            ✅ One-time enclave rename
+/settings            ✅ One-time enclave rename, abandon enclave
 /rankings            ✅ Power score leaderboard
 /bank                ✅ Deposit/withdraw, 2% fee, transaction history
 /market              ✅ Buy/sell orders (money/land/energy), cancel

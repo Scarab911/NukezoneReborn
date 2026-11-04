@@ -10,6 +10,28 @@
 
 ---
 
+## Current Implementation (2026-11) — Range, Land Floor, Shields
+
+> The lifecycle and phase sections below describe the original movement-based design.
+> Combat today is **instant** (`src/server/game-engine/combat.ts`, `POST /api/military/attack`).
+> These rules apply on top of it:
+
+| Rule | Value | Where |
+|------|-------|-------|
+| Networth | `totalUnits × 10 + land × 5` | `calcNetworth` in `src/lib/networth.ts` |
+| Attack range | `myNW × 0.5 ≤ targetNW ≤ myNW ÷ 0.5` — always mutual | `attackRange` / `rangeStatus`; checked in the attack route (403 if out of range) |
+| Land taken on win | 5% of defender land (min 1), never below the land floor | `landTakenOnWin` |
+| Land floor | 100 (= starting land) — combat ruins an enclave, never destroys it | `COMBAT.LAND_FLOOR` |
+| Ruin shield | Defender at the floor after a loss → PROTECTED for 24h | `grantRuinShield` in `protection.service.ts` |
+| New-player protection | 72h from founding | `newPlayerProtectionUntil` |
+| Shield storage | `Nation.protectedUntil`; expired shields are lifted lazily | `liftProtectionIfExpired` |
+| Attacking while shielded | Allowed with `acknowledgeProtectionLoss: true`; ends the shield | attack route |
+| Destruction | Only by player choice ("Abandon enclave") → DESTROYED → `/setup` | `abandonEnclave` in `nation.service.ts` |
+
+Known gap: unit losses (`attackerLost` / `defenderLost`) are recorded in the report but not yet removed from armies.
+
+---
+
 ## Battle Lifecycle
 
 ```
