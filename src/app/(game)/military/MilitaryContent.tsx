@@ -244,7 +244,7 @@ export function MilitaryContent({
 
         {/* Filter */}
         <div className="flex gap-1">
-          {(["all", "weaker", "stronger"] as FilterKey[]).map((f) => (
+          {(["inRange", "all", "weaker", "stronger"] as FilterKey[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}

@@ -77,11 +77,13 @@ Last updated: 2026-11-03
 ## 🔜 REMAINING
 
 ### Enclave Identity (follow-ups)
-- [ ] Verify in running app: register → setup → rename once → second rename blocked
+- [x] Verify in running app: register → setup → rename once → second rename blocked (2026-11-04)
 - [x] Networth attack range 50%–200%, checked server-side; military page shows range, greys out-of-range targets
 - [x] Ruin instead of destruction: land floor 100, 24h ruin shield, `Nation.protectedUntil`
 - [x] Abandon enclave (Settings) → DESTROYED → `/setup`; leaves alliance (leader handed over / alliance disbanded)
-- [ ] Verify in running app with 2–3 accounts: out-of-range attack blocked; land stops at 100; ruin shield blocks attackers; attacking ends own shield; abandon → setup → new enclave
+- [x] Verify in running app with 3 accounts: range (UI + API), land floor, ruin shield, attacking ends own shield, abandon → alliance handover → setup → new enclave (2026-11-04)
+- [ ] Setup screen says "was destroyed" after a voluntary abandon — reword
+- [ ] Hydration warning: header money formatted with server locale ("5 000") vs browser ("5,000") — use a fixed locale
 - [ ] Battles don't actually remove lost units (`attackerLost`/`defenderLost` only recorded) — so networth never drops from battle losses
 - [ ] Buildings vs. land: losing land doesn't remove buildings — decide what happens when buildings exceed land
 - [ ] Watch for shield farming (staying at 100 land to be shielded after each loss); add a cooldown if needed
