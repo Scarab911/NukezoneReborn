@@ -1,6 +1,8 @@
 import { BUILDINGS, COMBAT, MORALE } from "@/lib/game-constants";
 import { prisma } from "@/lib/db";
 import { planLandSeizure, totalLand } from "@/lib/networth";
+import { powerState } from "@/lib/power";
+import { NO_BONUSES, type TechBonuses } from "@/lib/tech-bonus";
 import { grantRuinShield } from "@/server/services/protection.service";
 import { syncOverflowDeadlines, type OverflowDeadlines } from "@/server/services/housing.service";
 import type { Resource, MoraleRecord, UnitType, Building, Prisma } from "@prisma/client";
@@ -94,7 +96,7 @@ function counterMultiplierFor(attackerCat: string, defCounts: Record<string, num
 
 // ── Power calculation ──────────────────────────────────────────────────────
 
-function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, number>): number {
+function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, number>, tech: TechBonuses): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
 
   let power = 0;
@@ -106,13 +108,14 @@ function calcAttackPower(nation: CombatNation, defenderCounts: Record<string, nu
     }
   }
 
-  return Math.floor(power * moraleMult);
+  return Math.floor(power * moraleMult * (1 + tech.attackPct));
 }
 
-function calcDefensePower(nation: CombatNation, attackerCounts: Record<string, number>): number {
+function calcDefensePower(nation: CombatNation, attackerCounts: Record<string, number>, tech: TechBonuses): number {
   const moraleMult = 0.6 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
   const towers     = nation.buildings.find((b) => b.type === "DEFENSE_TOWERS")?.count ?? 0;
-  const towerBonus = 1 + towers * BUILDINGS.DEFENSE_TOWER_BONUS;
+  // Towers run at the grid's power level — razed Power Plants weaken them
+  const towerBonus = 1 + towers * BUILDINGS.DEFENSE_TOWER_BONUS * powerState(nation.buildings).level;
 
   let power = 0;
   for (const army of nation.armies) {
@@ -124,7 +127,7 @@ function calcDefensePower(nation: CombatNation, attackerCounts: Record<string, n
     }
   }
 
-  return Math.floor(power * moraleMult * towerBonus);
+  return Math.floor(power * moraleMult * towerBonus * (1 + tech.defensePct));
 }
 
 function totalUnits(nation: CombatNation): number {
@@ -139,14 +142,16 @@ function totalUnits(nation: CombatNation): number {
 export function resolveInstant(
   attacker: CombatNation,
   defender: CombatNation,
+  /** Research bonuses of each side (see getTechBonuses). */
+  tech: { attacker: TechBonuses; defender: TechBonuses } = { attacker: NO_BONUSES, defender: NO_BONUSES },
 ): BattleResult {
   const seed    = makeSeed(attacker.id, defender.id);
   const rng     = mulberry32(seed);
 
   const defCounts = categoryCounts(defender);
   const atkCounts = categoryCounts(attacker);
-  const atkPower  = calcAttackPower(attacker, defCounts);
-  const defPower  = calcDefensePower(defender, atkCounts);
+  const atkPower  = calcAttackPower(attacker, defCounts, tech.attacker);
+  const defPower  = calcDefensePower(defender, atkCounts, tech.defender);
   const variance  = COMBAT.VARIANCE_MIN + rng() * (COMBAT.VARIANCE_MAX - COMBAT.VARIANCE_MIN);
   const effective = atkPower * variance;
 

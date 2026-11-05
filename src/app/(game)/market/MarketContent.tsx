@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 type Side = "BUY" | "SELL";
-type Resource = "MONEY" | "LAND" | "ENERGY";
+type Resource = "MONEY" | "LAND";
 
 interface Order {
   id: string; side: Side; resource: Resource;
@@ -18,14 +18,14 @@ interface Order {
 }
 
 interface Props {
-  resources: { money: number; land: number; energy: number };
+  resources: { money: number; land: number };
   openOrders: Order[];
   myOrders:   Order[];
 }
 
-const RESOURCES: Resource[] = ["MONEY", "LAND", "ENERGY"];
+const RESOURCES: Resource[] = ["MONEY", "LAND"];
 const RESOURCE_EMOJI: Record<Resource, string> = {
-  MONEY: "💰", LAND: "🌍", ENERGY: "⚡",
+  MONEY: "💰", LAND: "🌍",
 };
 
 export function MarketContent({ resources, openOrders, myOrders }: Props) {
@@ -77,7 +77,6 @@ export function MarketContent({ resources, openOrders, myOrders }: Props) {
       <div className="flex flex-wrap gap-3 text-xs font-mono">
         <span className="text-yellow-400">💰 {resources.money.toLocaleString()}</span>
         <span className="text-green-400">🌍 {resources.land.toLocaleString()}</span>
-        <span className="text-blue-400">⚡ {resources.energy.toLocaleString()}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

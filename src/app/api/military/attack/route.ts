@@ -10,6 +10,7 @@ import {
   liftProtectionIfExpired, protectionExpired, removeProtection,
 } from "@/server/services/protection.service";
 import { enforceHousing } from "@/server/services/housing.service";
+import { getTechBonuses } from "@/server/services/tech.service";
 
 const Schema = z.object({
   targetNationId: z.string().min(1),
@@ -124,7 +125,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Instant resolution ───────────────────────────────────────────────────
-  const result = resolveInstant(attackerNation, defenderNation);
+  const [attackerTech, defenderTech] = await Promise.all([
+    getTechBonuses(prisma, attackerNation.id),
+    getTechBonuses(prisma, defenderNation.id),
+  ]);
+  const result = resolveInstant(attackerNation, defenderNation, { attacker: attackerTech, defender: defenderTech });
 
   await spendTurns(attackerNation.id, TURNS.ATTACK_COST);
   const { battleId, landGained, buildingsDestroyed, summary, defenderShieldUntil, defenderOverflow } = await persistBattleResult(

@@ -31,7 +31,7 @@ export function TopBar({ nationName, money, land, turns, maxTurns }: TopBarProps
             className={turns > 0 ? "text-purple-400" : "text-slate-600"}
             title={`Turns (${turns}/${maxTurns ?? 100})`}
           >
-            ⚡ {turns}/{maxTurns ?? 100}
+            ⏳ {turns}/{maxTurns ?? 100}
           </span>
         )}
       </div>

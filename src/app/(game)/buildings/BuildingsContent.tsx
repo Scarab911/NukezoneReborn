@@ -7,15 +7,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { OverflowBanner, type Overflow } from "@/components/game/OverflowBanner";
+import type { PowerState } from "@/lib/power";
 
 export interface BuildingDef {
   type:      string;
   label:     string;
   emoji:     string;
   effect:    string;
-  /** False for buildings whose effect isn't implemented yet. */
-  active:    boolean;
   moneyCost: number;
+  /** Power each building draws (0 for Power Plants). */
+  powerDraw: number;
   count:     number;
   /** Housing buildings only: army space used / provided. */
   housing:   { used: number; capacity: number } | null;
@@ -29,12 +30,14 @@ interface Props {
   turnsPerBuilding: number;
   maxPerOrder:      number;
   buildings:        BuildingDef[];
+  power:            PowerState;
   overflows:        Overflow[];
 }
 
 export function BuildingsContent({
-  money, land, turns, landPerBuilding, turnsPerBuilding, maxPerOrder, buildings, overflows,
+  money, land, turns, landPerBuilding, turnsPerBuilding, maxPerOrder, buildings, power, overflows,
 }: Props) {
+  const sparePower = power.supply - power.draw;
   const router = useRouter();
   const [quantities, setQuantities] = useState<Record<string, number>>(
     Object.fromEntries(buildings.map((b) => [b.type, 1])),
@@ -79,11 +82,26 @@ export function BuildingsContent({
 
       <OverflowBanner overflows={overflows} />
 
+      {power.level < 1 && (
+        <div className="bg-orange-950/40 border border-orange-800/60 rounded-lg px-4 py-3 text-sm">
+          <p className="text-orange-300 font-semibold">
+            ⚡ Power shortage: {power.supply} supply for {power.draw} demand ({Math.round(power.level * 100)}%)
+          </p>
+          <p className="text-orange-200/70 text-xs mt-1">
+            Defense Towers and Research Labs run at reduced strength and training is halted.
+            Build Power Plants to restore full power.
+          </p>
+        </div>
+      )}
+
       {/* Resource bar */}
       <div className="flex flex-wrap gap-4 text-xs font-mono">
         <span className="text-yellow-400">💰 {money.toLocaleString()} money</span>
         <span className="text-green-400">🌍 {land.toLocaleString()} free land</span>
-        <span className="text-purple-400">⚡ {turns} turns</span>
+        <span className="text-purple-400">⏳ {turns} turns</span>
+        <span className={sparePower < 0 ? "text-orange-400" : "text-blue-400"}>
+          ⚡ Power {power.draw}/{power.supply} used · {Math.max(0, sparePower)} spare
+        </span>
         <span className="text-slate-500">🏗️ {totalBuilt} total buildings</span>
       </div>
 
@@ -94,11 +112,13 @@ export function BuildingsContent({
           const totalMoney = b.moneyCost       * qty;
           const totalLand  = landPerBuilding   * qty;
           const totalTurns = turnsPerBuilding  * qty;
-          const canAfford  = money >= totalMoney && land >= totalLand && turns >= totalTurns;
+          const totalPower = b.powerDraw       * qty;
+          const hasPower   = totalPower <= sparePower;
+          const canAfford  = money >= totalMoney && land >= totalLand && turns >= totalTurns && hasPower;
           const over       = b.housing !== null && b.housing.used > b.housing.capacity;
 
           return (
-            <Card key={b.type} className={`bg-slate-900 ${over ? "border-red-800/60" : "border-slate-800"} ${b.active ? "" : "opacity-60"}`}>
+            <Card key={b.type} className={`bg-slate-900 ${over ? "border-red-800/60" : "border-slate-800"}`}>
               <CardContent className="pt-4 pb-4">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
@@ -128,7 +148,8 @@ export function BuildingsContent({
                 <div className="flex items-center gap-3 text-xs font-mono text-slate-500 mb-3">
                   <span>💰 {b.moneyCost.toLocaleString()}</span>
                   <span>🌍 {landPerBuilding} land</span>
-                  <span>⚡ {turnsPerBuilding} turns</span>
+                  <span>⏳ {turnsPerBuilding} turns</span>
+                  {b.powerDraw > 0 && <span>⚡ {b.powerDraw} power</span>}
                 </div>
 
                 {/* Build form */}
@@ -146,9 +167,14 @@ export function BuildingsContent({
                   >
                     {busy === b.type
                       ? "Building…"
-                      : `Build (💰${totalMoney.toLocaleString()} · 🌍${totalLand} · ⚡${totalTurns})`}
+                      : `Build (💰${totalMoney.toLocaleString()} · 🌍${totalLand} · ⏳${totalTurns})`}
                   </button>
                 </div>
+                {!hasPower && (
+                  <p className="text-[11px] text-orange-400 mt-1">
+                    Needs {totalPower} power, {Math.max(0, sparePower)} spare: build a Power Plant
+                  </p>
+                )}
               </CardContent>
             </Card>
           );

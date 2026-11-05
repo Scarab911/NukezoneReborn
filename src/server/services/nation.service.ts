@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Nation, Resource, MoraleRecord, Prisma } from "@prisma/client";
-import { BUILDINGS, ECONOMY, ENCLAVE, TURNS } from "@/lib/game-constants";
+import { BUILDINGS, ECONOMY, ENCLAVE, POWER, TURNS } from "@/lib/game-constants";
 import { newPlayerProtectionUntil } from "@/server/services/protection.service";
 
 const WORLD_ID = "world_01";
@@ -80,8 +80,9 @@ export async function foundEnclave(playerId: string, name: string): Promise<Foun
       data: {
         nationId: n.id,
         money:    ECONOMY.STARTING_MONEY,
-        // Starting barracks stand on the starting land
-        land:     ECONOMY.STARTING_LAND - BUILDINGS.STARTING_BARRACKS * BUILDINGS.LAND_PER_BUILDING,
+        // Starting barracks and power plant stand on the starting land
+        land:     ECONOMY.STARTING_LAND
+                  - (BUILDINGS.STARTING_BARRACKS + POWER.STARTING_PLANTS) * BUILDINGS.LAND_PER_BUILDING,
         energy:   ECONOMY.STARTING_ENERGY,
       },
     });
@@ -89,7 +90,12 @@ export async function foundEnclave(playerId: string, name: string): Promise<Foun
     await tx.bankAccount.create({ data: { nationId: n.id, balance: 0 } });
     await tx.cIRating.create({ data: { nationId: n.id, rating: 10 } });
     await tx.army.create({ data: { nationId: n.id, name: "Home Guard", status: "STATIONED" } });
-    await tx.building.create({ data: { nationId: n.id, type: "BARRACKS", count: BUILDINGS.STARTING_BARRACKS } });
+    await tx.building.createMany({
+      data: [
+        { nationId: n.id, type: "BARRACKS",    count: BUILDINGS.STARTING_BARRACKS },
+        { nationId: n.id, type: "POWER_PLANT", count: POWER.STARTING_PLANTS },
+      ],
+    });
 
     return { ok: true, nationId: n.id } as const;
   });

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ResearchContent } from "./ResearchContent";
+import { powerState } from "@/lib/power";
+import { BUILDINGS } from "@/lib/game-constants";
 
 export default async function ResearchPage() {
   const session = await auth();
@@ -9,7 +11,7 @@ export default async function ResearchPage() {
 
   const nation = await prisma.nation.findUnique({
     where:   { playerId: session.user.id },
-    include: { resource: true },
+    include: { resource: true, buildings: { select: { type: true, count: true } } },
   });
   if (!nation) redirect("/setup");
 
@@ -19,12 +21,21 @@ export default async function ResearchPage() {
   ]);
 
   const progressMap = Object.fromEntries(
-    progress.map((p) => [p.techNodeId, { status: p.status, completesAt: p.completesAt?.toISOString() ?? null }]),
+    progress.map((p) => [p.techNodeId, {
+      status:      p.status,
+      startedAt:   p.startedAt.toISOString(),
+      completesAt: p.completesAt.toISOString(),
+    }]),
   );
+  const labs  = nation.buildings.find((b) => b.type === "RESEARCH_LAB")?.count ?? 0;
+  const power = powerState(nation.buildings);
 
   return (
     <ResearchContent
       gold={nation.resource?.money ?? 0}
+      labs={labs}
+      powerLevel={power.level}
+      labSpeed={BUILDINGS.RESEARCH_LAB_SPEED}
       techNodes={techNodes.map((n) => ({
         id:            n.id,
         name:          n.name,

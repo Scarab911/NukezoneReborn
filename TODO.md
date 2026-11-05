@@ -91,7 +91,11 @@ Last updated: 2026-11-04
 - [x] Army housing: units take space in housing buildings; Barracks added; attack bonuses removed; 24h overflow deadline → proportional desertion (2026-11-04)
 - [x] Building service: one atomic transaction (turns + money + land guarded), turn errors returned as 400, destroyed enclaves rejected (2026-11-04)
 - [ ] Verify housing in running app (dev server must be restarted to load the new Prisma client): train to cap → rejected; raze barracks → banner + deadline; rebuild clears; past deadline → desertion
-- [ ] Research Lab / Power Plant have no effect yet (labelled on the page) — implement or remove
+- [x] Power grid: Power Plants supply 10, other buildings draw 1–3; building needs spare power; shortage scales towers + labs and halts training; energy stockpile retired from UI/market (2026-11-05)
+- [x] Research Labs speed research (÷ 1 + 10% × labs × power level); research income/attack/defense bonuses applied; Arsenal lock shows researched units as unlocked (2026-11-05)
+- [ ] Market has no order matching — orders never fill, so the sell tax (and Market Efficiency research) never applies
+- [ ] Research bonuses not active yet: spy slots, CI rating, missile intercept
+- [ ] Decide: drop `Resource.energy` column (unused since the power grid)
 - [ ] Economy tick uses `Resource.updatedAt` as its clock, so any resource write (build, explore, battle) resets accrued income — add a dedicated `lastTickAt`
 - [ ] Explore's 10,000 land cap checks free land only, so building lets total land exceed it; battle land gains ignore the cap
 - [ ] Income counts free land only, so each building costs 50 money/tick in lost income — decide if intended

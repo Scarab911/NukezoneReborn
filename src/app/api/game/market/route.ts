@@ -5,7 +5,8 @@ import { z } from "zod";
 
 const CreateOrderSchema = z.object({
   side:        z.enum(["BUY", "SELL"]),
-  resource:    z.enum(["MONEY", "LAND", "ENERGY"]),
+  // Energy is a power-grid capacity now, not a tradeable stockpile
+  resource:    z.enum(["MONEY", "LAND"]),
   quantity:    z.number().int().min(10).max(10_000),
   pricePerUnit: z.number().int().min(1).max(100_000),
 });
@@ -38,7 +39,6 @@ export async function GET() {
     resources: {
       money:  nation.resource?.money  ?? 0,
       land:   nation.resource?.land   ?? 0,
-      energy: nation.resource?.energy ?? 0,
     },
   });
 }

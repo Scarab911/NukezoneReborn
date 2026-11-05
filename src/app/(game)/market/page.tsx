@@ -30,15 +30,14 @@ export default async function MarketPage() {
       resources={{
         money:  nation.resource?.money  ?? 0,
         land:   nation.resource?.land   ?? 0,
-        energy: nation.resource?.energy ?? 0,
       }}
       openOrders={openOrders.map((o) => ({
-        id: o.id, side: o.side as "BUY" | "SELL", resource: o.resource as "MONEY" | "LAND" | "ENERGY",
+        id: o.id, side: o.side as "BUY" | "SELL", resource: o.resource as "MONEY" | "LAND",
         quantity: o.quantity, filledQty: o.filledQty, pricePerUnit: o.pricePerUnit,
         isOwn: o.nationId === nation.id,
       }))}
       myOrders={myOrders.map((o) => ({
-        id: o.id, side: o.side as "BUY" | "SELL", resource: o.resource as "MONEY" | "LAND" | "ENERGY",
+        id: o.id, side: o.side as "BUY" | "SELL", resource: o.resource as "MONEY" | "LAND",
         quantity: o.quantity, filledQty: o.filledQty, pricePerUnit: o.pricePerUnit,
         createdAt: o.createdAt.toISOString(),
       }))}

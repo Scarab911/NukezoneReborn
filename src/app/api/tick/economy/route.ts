@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ECONOMY, MORALE } from "@/lib/game-constants";
 import { enforceHousing } from "@/server/services/housing.service";
+import { getTechBonuses } from "@/server/services/tech.service";
 
 const TICK_INTERVAL_MS = 30_000;
 
@@ -38,7 +39,8 @@ export async function POST() {
     const moraleMultiplier = 0.5 + ((nation.morale?.morale ?? 75) / 100) * 0.8;
     const land = nation.resource.land;
 
-    const incomePerTick = Math.floor(land * ECONOMY.BASE_INCOME_PER_LAND * moraleMultiplier);
+    const { incomePct } = await getTechBonuses(prisma, nation.id);
+    const incomePerTick = Math.floor(land * ECONOMY.BASE_INCOME_PER_LAND * moraleMultiplier * (1 + incomePct));
     const upkeepPerTick = Math.floor(totalUnits * ECONOMY.UPKEEP_PER_UNIT);
     const netPerTick    = incomePerTick - upkeepPerTick;
     const totalNet      = netPerTick * ticks;

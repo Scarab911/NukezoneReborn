@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ArsenalContent } from "./ArsenalContent";
 import { HOUSING_BUILDINGS, HOUSING_LABEL, housingFor, listOverflows } from "@/lib/housing";
 import { getBuildingsOverview } from "@/server/services/building.service";
+import { finishedResearchWhere } from "@/server/services/tech.service";
 
 export default async function ArsenalPage() {
   const session = await auth();
@@ -19,7 +20,7 @@ export default async function ArsenalPage() {
   const overview = await getBuildingsOverview(session.user.id);
   if (!overview) redirect("/setup");
 
-  const [unitTypes, armies, trainingQueue] = await Promise.all([
+  const [unitTypes, armies, trainingQueue, finished] = await Promise.all([
     prisma.unitType.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.army.findMany({
       where:   { nationId: nation.id },
@@ -29,7 +30,12 @@ export default async function ArsenalPage() {
       where:   { nationId: nation.id, completesAt: { gt: new Date() } },
       orderBy: { completesAt: "asc" },
     }),
+    prisma.researchProgress.findMany({
+      where:  finishedResearchWhere(nation.id),
+      select: { techNode: { select: { slug: true } } },
+    }),
   ]);
+  const researched = new Set(finished.map((r) => r.techNode.slug));
 
   const ownedUnits: Record<string, number> = {};
   for (const army of armies) {
@@ -49,6 +55,7 @@ export default async function ArsenalPage() {
         capacity: overview.capacity[b],
       }))}
       overflows={listOverflows(overview.capacity, overview.usage, overview.deadlines)}
+      power={overview.power}
       ownedUnits={ownedUnits}
       unitTypes={unitTypes.map((u) => ({
         id:          u.id,
@@ -60,6 +67,7 @@ export default async function ArsenalPage() {
         moneyCost:   u.moneyCost,
         upkeep:      u.upkeep,
         requiresTech: u.requiresTech,
+        unlocked:    !u.requiresTech || researched.has(u.requiresTech),
         sortOrder:   u.sortOrder,
         housing:     housingFor(u.slug),
       }))}

@@ -31,7 +31,8 @@
 | Destruction | Only by player choice ("Abandon enclave") → DESTROYED → `/setup` | `abandonEnclave` in `nation.service.ts` |
 
 | Housing after razing | If razing leaves the defender's army without room, a 24h desertion deadline starts per housing type (not reset by later razes); see "Army Housing" in `ECONOMY_ENGINE.md` | `syncOverflowDeadlines` after casualties in `persistBattleResult`; `enforceHousing` runs for both sides before combat |
-| Building bonuses | Only Defense Towers affect combat (+8% defense each). Other buildings house units instead of giving attack bonuses | `calcDefensePower` |
+| Building bonuses | Only Defense Towers affect combat: +8% defense each × the defender's power level (supply ÷ demand). Other buildings house units instead of giving attack bonuses | `calcDefensePower` |
+| Research bonuses | Finished research adds `attack_pct` to attack power and `defense_pct` to defense power (additive) | `getTechBonuses`, passed to `resolveInstant` by the attack route |
 | Casualties | Win: attacker −10%, defender −30% · Loss: attacker −20%, defender −5% (rounded up) | `distributeLosses` splits each side's loss across unit types in proportion to stack size; `Nation.totalUnits` is reset to the real remaining count |
 
 ---

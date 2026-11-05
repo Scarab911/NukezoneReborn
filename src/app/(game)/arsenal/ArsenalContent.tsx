@@ -8,6 +8,7 @@ import { ArsenalTrainForm } from "./ArsenalTrainForm";
 import { OverflowBanner, type Overflow } from "@/components/game/OverflowBanner";
 import type { HousingBuilding } from "@/lib/game-constants";
 import type { UnitHousing } from "@/lib/housing";
+import type { PowerState } from "@/lib/power";
 
 type UnitCat = "GROUND" | "AIR" | "SEA" | "SPECIAL" | "STRATEGIC";
 
@@ -15,6 +16,8 @@ interface UnitTypeData {
   id: string; name: string; slug: string; category: string;
   attack: number; defense: number; moneyCost: number; upkeep: number;
   requiresTech: string | null; sortOrder: number;
+  /** False until the required tech is researched. */
+  unlocked: boolean;
   housing: UnitHousing;
 }
 
@@ -31,6 +34,7 @@ interface Props {
   ownedUnits:    Record<string, number>;
   housing:       HousingRow[];
   overflows:     Overflow[];
+  power:         PowerState;
   unitTypes:     UnitTypeData[];
   trainingQueue: Array<{ id: string; unitTypeId: string; quantity: number; completesAt: string }>;
 }
@@ -58,7 +62,7 @@ const COUNTER_HINT: Record<string, string> = {
   "stealth-raider-wing":   "Counters: Leviathan Destroyer",
 };
 
-export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, unitTypes, trainingQueue }: Props) {
+export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, power, unitTypes, trainingQueue }: Props) {
   const [activeTab, setActiveTab] = useState<UnitCat>("GROUND");
 
   const byCategory = Object.fromEntries(
@@ -76,10 +80,16 @@ export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, u
 
       <div className="flex gap-2 text-xs font-mono">
         <span className="text-yellow-400">💰 {money.toLocaleString()}</span>
-        <span className="text-purple-400">⚡ {turns} turns</span>
+        <span className="text-purple-400">⏳ {turns} turns</span>
       </div>
 
       <OverflowBanner overflows={overflows} />
+
+      {power.level < 1 && (
+        <div className="bg-orange-950/40 border border-orange-800/60 rounded-lg px-4 py-3 text-sm text-orange-300">
+          ⚡ Power shortage ({power.supply}/{power.draw}): training is halted until you build more Power Plants.
+        </div>
+      )}
 
       {/* Housing — units live in buildings */}
       <div className="flex flex-wrap gap-2 text-xs font-mono">
@@ -129,7 +139,7 @@ export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, u
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {visible.map((unit) => {
           const owned  = ownedUnits[unit.slug] ?? 0;
-          const locked = !!unit.requiresTech;
+          const locked = !unit.unlocked;
           const home   = housing.find((h) => h.building === unit.housing.building);
           const free   = home ? home.capacity - home.used : 0;
 
@@ -168,7 +178,7 @@ export function ArsenalContent({ money, turns, ownedUnits, housing, overflows, u
                   </div>
                 )}
 
-                {!locked && (
+                {!locked && power.level >= 1 && (
                   <ArsenalTrainForm
                     unitTypeId={unit.id}
                     unitName={unit.name}

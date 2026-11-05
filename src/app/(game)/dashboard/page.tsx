@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { calcNetworth, totalLand } from "@/lib/networth";
+import { powerState } from "@/lib/power";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncTurns, minutesToNextTurn } from "@/server/game-engine/turns";
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
     include: {
       resource:  true,
       morale:    true,
-      buildings: { select: { count: true } },
+      buildings: { select: { type: true, count: true } },
       _count:    { select: { armies: true, spyUnits: true, attackingBattles: true } },
     },
   });
@@ -48,7 +49,7 @@ export default async function DashboardPage() {
           totalUnits: nation.totalUnits,
           land:       totalLand(nation.resource?.land ?? 0, nation.buildings.reduce((s, b) => s + b.count, 0)),
         }),
-        energy: nation.resource?.energy ?? 0,
+        grid:   (({ supply, draw }) => ({ supply, draw }))(powerState(nation.buildings)),
       }}
     />
   );

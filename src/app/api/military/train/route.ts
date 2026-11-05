@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { checkCanHouse, enforceHousing } from "@/server/services/housing.service";
+import { finishedResearchWhere } from "@/server/services/tech.service";
+import { powerState } from "@/lib/power";
 
 const TrainSchema = z.object({
   unitTypeId: z.string().min(1),
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   if (unitType.requiresTech) {
     const hasResearch = await prisma.researchProgress.findFirst({
-      where: { nationId: nation.id, techNode: { slug: unitType.requiresTech }, status: "COMPLETED" },
+      where: { ...finishedResearchWhere(nation.id), techNode: { slug: unitType.requiresTech } },
     });
     if (!hasResearch) return NextResponse.json({ error: `Requires: ${unitType.requiresTech}` }, { status: 403 });
   }
@@ -54,6 +56,14 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       // Apply any expired desertion first, then check there's room
       await enforceHousing(tx, nation.id);
+
+      // A power shortage (e.g. razed Power Plants) halts training
+      const grid = powerState(await tx.building.findMany({
+        where: { nationId: nation.id }, select: { type: true, count: true },
+      }));
+      if (grid.level < 1) {
+        throw new TrainRejected(`Power shortage (${grid.supply}/${grid.draw}): build Power Plants to train again`);
+      }
       const noRoom = await checkCanHouse(tx, nation.id, unitType.slug, quantity);
       if (noRoom) throw new TrainRejected(noRoom);
 

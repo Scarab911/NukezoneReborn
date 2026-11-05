@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-11-05 — Power Grid + Research Effects
+
+### What Was Done
+- **Power grid** (owner's design: capacity, not stockpile):
+  - Power Plants supply 10. Other buildings draw: Barracks 1; War Factory, Airfield, Shipyard and Defense Towers 2; Missile Silo and Research Lab 3.
+  - Building needs spare power.
+  - A shortage after razing gives power level = supply ÷ demand, which scales Defense Towers and the Research Lab speed-up and halts training. Housing is unaffected.
+  - Constants are in `POWER`; maths in `src/lib/power.ts`.
+- **Research Lab:** research time ÷ (1 + 10% × labs × power level), fixed at start. The research progress bar now uses the real `startedAt`.
+- **Research bonuses made real** (`src/lib/tech-bonus.ts`, `src/server/services/tech.service.ts`): income in the economy tick, attack and defense in combat. Expired IN_PROGRESS research counts as done, including for unit unlocks. Other bonuses are labelled "not active yet" (the market has no order matching, so the tax research has nothing to apply to).
+- **Energy stockpile retired** from the dashboard and market (`Resource.energy` column kept, unused). The dashboard shows "Power grid draw/supply" and renames networth "Power" → "Networth". The turns icon is now ⏳ everywhere so ⚡ means power.
+- **Arsenal fix:** units showed 🔒 "Requires tech" even after researching.
+- **New enclaves:** 2 Barracks + 1 Power Plant (85 free land).
+- **DB backfill (Supabase MCP):** each living enclave got enough Power Plants to cover its current draw, paid from free land (Bravo 8, others 1).
+
+### Verified
+- `tsc` and `eslint` are clean; 14 pure-maths checks pass.
+- **Against the real DB:**
+  - a build without spare power is rejected and writes nothing;
+  - research bonuses sum correctly, and expired IN_PROGRESS research counts (rolled back);
+  - combat: 10 towers give +80% at full power and +40% at 50%; tech gives ×1.25 attack and ×1.35 defense.
+
+### Not Yet Verified
+- **Not exercised in the running app.** Restart the dev server first (stale Prisma client from the housing change).
+
+---
+
 ## Session: 2026-11-04 (later) — Building Audit + Army Housing
 
 ### What Was Done

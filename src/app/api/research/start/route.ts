@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { powerState, researchDurationSecs } from "@/lib/power";
 
 const Schema = z.object({ techNodeId: z.string().min(1) }); // IDs are plain strings from seed
 
@@ -16,7 +17,10 @@ export async function POST(req: NextRequest) {
   const { techNodeId } = parsed.data;
 
   const [nation, techNode] = await Promise.all([
-    prisma.nation.findUnique({ where: { playerId: session.user.id }, include: { resource: true } }),
+    prisma.nation.findUnique({
+      where:   { playerId: session.user.id },
+      include: { resource: true, buildings: { select: { type: true, count: true } } },
+    }),
     prisma.techNode.findUnique({ where: { id: techNodeId } }),
   ]);
 
@@ -48,7 +52,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not enough money" }, { status: 400 });
   }
 
-  const completesAt = new Date(Date.now() + techNode.durationSecs * 1000);
+  // Research Labs shorten it, scaled by the power grid; fixed once started
+  const labs         = nation.buildings.find((b) => b.type === "RESEARCH_LAB")?.count ?? 0;
+  const durationSecs = researchDurationSecs(techNode.durationSecs, labs, powerState(nation.buildings).level);
+  const completesAt  = new Date(Date.now() + durationSecs * 1000);
 
   await prisma.$transaction([
     prisma.resource.update({
@@ -60,5 +67,5 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json({ success: true, completesAt }, { status: 201 });
+  return NextResponse.json({ success: true, completesAt, durationSecs }, { status: 201 });
 }

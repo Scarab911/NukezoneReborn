@@ -1,8 +1,9 @@
 // Construction — one atomic transaction: turns, money and land are spent with
 // guarded decrements, so concurrent requests can never overspend.
 import { prisma } from "@/lib/db";
-import { BUILDINGS, TURNS, type HousingBuilding } from "@/lib/game-constants";
+import { BUILDINGS, POWER, TURNS, type HousingBuilding } from "@/lib/game-constants";
 import { capacityByBuilding, usageByBuilding, type SpaceByBuilding } from "@/lib/housing";
+import { drawFor, powerState, type PowerState } from "@/lib/power";
 import { syncTurns } from "@/server/game-engine/turns";
 import { enforceHousing, syncOverflowDeadlines } from "@/server/services/housing.service";
 import type { BuildingType } from "@prisma/client";
@@ -26,6 +27,7 @@ export interface BuildingsOverview {
   usage:     SpaceByBuilding;
   /** Open overflow deadlines, ISO strings. */
   deadlines: Partial<Record<HousingBuilding, string>>;
+  power:     PowerState;
 }
 
 /**
@@ -62,6 +64,7 @@ export async function getBuildingsOverview(playerId: string): Promise<BuildingsO
       capacity:  capacityByBuilding(buildings),
       usage:     usageByBuilding(units.map((u) => ({ slug: u.unitType.slug, quantity: u.quantity }))),
       deadlines,
+      power:     powerState(buildings),
     };
   }, { timeout: 15_000 });
 }
@@ -83,6 +86,21 @@ export async function buildBuildings(playerId: string, type: BuildingType, count
   try {
     await prisma.$transaction(async (tx) => {
       await enforceHousing(tx, nation.id);
+
+      // Power grid — everything but a Power Plant needs spare power
+      if (type !== "POWER_PLANT") {
+        const grid  = powerState(await tx.building.findMany({
+          where: { nationId: nation.id }, select: { type: true, count: true },
+        }));
+        const spare = grid.supply - grid.draw;
+        const need  = drawFor(type, count);
+        if (need > spare) {
+          throw new BuildRejected(
+            `Need more Power Plants: needs ${need} power, ${Math.max(0, spare)} spare (each plant supplies ${POWER.SUPPLY_PER_PLANT})`,
+            400,
+          );
+        }
+      }
 
       const spentTurns = await tx.nation.updateMany({
         where: { id: nation.id, turns: { gte: turnCost } },

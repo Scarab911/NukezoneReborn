@@ -160,7 +160,7 @@ export function MilitaryContent({
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Military</h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          ⚡ {turns} turns — 1 per attack · Your power: <span className="text-orange-400 font-mono">{myPower.toLocaleString()}</span>
+          ⏳ {turns} turns — 1 per attack · Your networth: <span className="text-orange-400 font-mono">{myPower.toLocaleString()}</span>
         </p>
         <p className="text-slate-500 text-sm mt-0.5">
           🎯 Your range: <span className="text-slate-300 font-mono">{myRange.min.toLocaleString()} – {myRange.max.toLocaleString()}</span> power

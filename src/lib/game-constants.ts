@@ -94,6 +94,27 @@ export const BUILDINGS = {
     DEFENSE_TOWERS: 300,
   },
   DEFENSE_TOWER_BONUS: 0.08, // +8% defense per Defense Tower
+  RESEARCH_LAB_SPEED:  0.10, // research time ÷ (1 + 10% × labs × power level)
+} as const;
+
+// ── Power grid ────────────────────────────────────────────────────────────
+// Power is a capacity, not a stockpile: Power Plants supply it, every other
+// building draws it. A new building needs spare power. If razing leaves the grid
+// short, power level = supply ÷ demand scales Defense Towers and Research Labs,
+// and training is blocked until it's back to 100%.
+export const POWER = {
+  STARTING_PLANTS: 1,
+  SUPPLY_PER_PLANT: 10,
+  DRAW: {
+    BARRACKS:       1,
+    WAR_FACTORY:    2,
+    AIRFIELD:       2,
+    SHIPYARD:       2,
+    MISSILE_SILO:   3,
+    RESEARCH_LAB:   3,
+    DEFENSE_TOWERS: 2,
+    POWER_PLANT:    0,
+  },
 } as const;
 
 // ── Housing ───────────────────────────────────────────────────────────────

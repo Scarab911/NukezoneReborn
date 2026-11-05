@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { researchDurationSecs } from "@/lib/power";
+import { describeBonus, isActiveBonus } from "@/lib/tech-bonus";
 
 type ResearchStatus = "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
@@ -25,11 +27,16 @@ interface TechNodeData {
 
 interface ProgressEntry {
   status:      ResearchStatus;
-  completesAt: string | null;
+  startedAt:   string;
+  completesAt: string;
 }
 
 interface Props {
   gold:        number;
+  /** Research Labs built, the grid's power level (0–1) and speed per lab. */
+  labs:        number;
+  powerLevel:  number;
+  labSpeed:    number;
   techNodes:   TechNodeData[];
   progressMap: Record<string, ProgressEntry>;
 }
@@ -50,7 +57,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   NUCLEAR:   "☢️ Nuclear",
 };
 
-export function ResearchContent({ gold, techNodes, progressMap }: Props) {
+export function ResearchContent({ gold, labs, powerLevel, labSpeed, techNodes, progressMap }: Props) {
   const router  = useRouter();
   const [busy,  setBusy]  = useState<string | null>(null);
   const [now,   setNow]   = useState(() => Date.now());
@@ -96,12 +103,14 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
     router.refresh();
   }
 
-  function progressPct(entry: ProgressEntry, node: TechNodeData): number {
-    if (!entry.completesAt) return 0;
+  function progressPct(entry: ProgressEntry): number {
     const end   = new Date(entry.completesAt).getTime();
-    const start = end - node.durationSecs * 1000;
+    const start = new Date(entry.startedAt).getTime();
+    if (end <= start) return 100;
     return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
   }
+
+  const speedPct = Math.round(labs * labSpeed * powerLevel * 100);
 
   function timeLeft(completesAt: string): string {
     const diff = Math.max(0, new Date(completesAt).getTime() - now);
@@ -126,7 +135,15 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
         <p className="text-slate-500 text-sm mt-0.5">Advance your enclave&apos;s technology</p>
       </div>
 
-      <div className="text-xs font-mono text-yellow-400">💰 {gold.toLocaleString()} money available</div>
+      <div className="flex flex-wrap gap-4 text-xs font-mono">
+        <span className="text-yellow-400">💰 {gold.toLocaleString()} money available</span>
+        <span className="text-blue-400">
+          🔬 {labs} Research Lab{labs === 1 ? "" : "s"}: research {speedPct > 0 ? `${speedPct}% faster` : "at base speed"}
+        </span>
+        {powerLevel < 1 && (
+          <span className="text-orange-400">⚡ Power shortage: labs at {Math.round(powerLevel * 100)}%</span>
+        )}
+      </div>
 
       {/* Active research banner */}
       {activeTech && activeEntry && (
@@ -140,7 +157,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
             </span>
           </div>
           <Progress
-            value={progressPct(activeEntry[1], activeTech)}
+            value={progressPct(activeEntry[1])}
             className="h-2 bg-slate-700 [&>div]:bg-blue-500"
           />
         </div>
@@ -191,9 +208,12 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
                       </Badge>
                     </div>
 
-                    {node.bonusType && (
+                    {describeBonus(node.bonusType, node.bonusValue) && (
                       <p className="text-xs text-slate-400 mb-3">
-                        Bonus: <span className="text-green-400">{node.bonusType} +{node.bonusValue}</span>
+                        Bonus:{" "}
+                        {isActiveBonus(node.bonusType)
+                          ? <span className="text-green-400">{describeBonus(node.bonusType, node.bonusValue)}</span>
+                          : <span className="text-slate-500">{describeBonus(node.bonusType, node.bonusValue)} (not active yet)</span>}
                       </p>
                     )}
 
@@ -203,7 +223,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
 
                     {inProg && entry.completesAt && (
                       <Progress
-                        value={progressPct(entry, node)}
+                        value={progressPct(entry)}
                         className="h-1.5 bg-slate-700 [&>div]:bg-blue-500 mt-1"
                       />
                     )}
@@ -214,7 +234,7 @@ export function ResearchContent({ gold, techNodes, progressMap }: Props) {
                         disabled={busy === node.id}
                         className="mt-3 w-full h-7 text-xs font-semibold rounded bg-blue-800 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors"
                       >
-                        {busy === node.id ? "Starting…" : `Research — ⏱ ${formatTime(node.durationSecs)}`}
+                        {busy === node.id ? "Starting…" : `Research — ⏱ ${formatTime(researchDurationSecs(node.durationSecs, labs, powerLevel))}`}
                       </button>
                     )}
 

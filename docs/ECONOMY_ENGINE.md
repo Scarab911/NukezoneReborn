@@ -317,6 +317,36 @@ Units live in buildings. To field a bigger army, a player needs more housing bui
 
 ---
 
+## Power Grid (current implementation, 2026-11)
+
+Power is a **capacity, not a stockpile**: Power Plants supply it and every other building draws it. Nothing accumulates or drains over time. All numbers are in `POWER` in `src/lib/game-constants.ts`; the maths is in `src/lib/power.ts`.
+
+| Building | Power |
+|---|---|
+| Power Plant | supplies 10 |
+| Barracks | draws 1 |
+| War Factory, Airfield, Shipyard, Defense Towers | draws 2 |
+| Missile Silo, Research Lab | draws 3 |
+
+- **Building:** a new building needs spare power (`buildBuildings` rejects it otherwise). Expanding means building plants, which need land.
+- **New enclaves** start with 2 Barracks + 1 Power Plant (85 free land + 15 built = 100).
+- **Shortage** (only after razing): power level = supply ÷ demand.
+  - Defense Towers give bonus × level, and the Research Lab speed-up is × level.
+  - Training is blocked until the level is back to 100%.
+  - Housing is unaffected.
+- **The energy stockpile is retired.** `Resource.energy` is unused and is no longer shown or traded on the market.
+
+## Research Effects (current implementation, 2026-11)
+
+- **Research Lab:** research time = base ÷ (1 + 10% × labs × power level). The time is fixed when research starts.
+- **Bonuses applied** (they stack additively; `getTechBonuses` in `src/server/services/tech.service.ts`):
+  - `income_pct` in the economy tick;
+  - `attack_pct` and `defense_pct` in combat.
+- **Not active yet:** `market_tax_pct` (the market has no order matching yet), `spy_slots`, `ci_rating`, `intercept_pct`. The research page labels these.
+- **Counting as done:** research is COMPLETED, or IN_PROGRESS with its time run out (status only flips when the research page is opened). See `finishedResearchWhere`; it's also used for unit unlocks.
+
+---
+
 ## Resource Sink Summary
 
 Why each sink exists:
